@@ -1,0 +1,17 @@
+{
+  "packages": {
+    ".": {
+      "release-type": "python",
+      "bump-minor-pre-major": true,
+      "changelog-sections": [
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "refactor", "section": "Code Refactoring" },
+        { "type": "test", "section": "Tests" },
+        { "type": "docs", "section": "Documentation" },
+        { "type": "chore", "section": "Miscellaneous" },
+        { "type": "ci", "section": "CI/CD" }
+      ]
+    }
+  }
+}

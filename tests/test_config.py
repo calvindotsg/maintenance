@@ -1,0 +1,59 @@
+"""Tests for configuration loading."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from unittest.mock import patch
+
+from maintenance.config import DEFAULT_TASKS, Config
+
+
+def test_default_config_has_all_tasks_enabled():
+    config = Config()
+    for task in DEFAULT_TASKS:
+        assert config.is_enabled(task)
+
+
+def test_load_nonexistent_config_returns_defaults():
+    config = Config.load(Path("/nonexistent/config.toml"))
+    for task in DEFAULT_TASKS:
+        assert config.is_enabled(task)
+
+
+def test_env_var_disables_task(monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_GCLOUD", "false")
+    config = Config.load(Path("/nonexistent/config.toml"))
+    assert not config.is_enabled("gcloud")
+    assert config.is_enabled("pnpm")
+
+
+def test_env_var_overrides_config(tmp_path):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('[tasks]\ngcloud = true\n')
+
+    with patch.dict("os.environ", {"MAINTENANCE_GCLOUD": "false"}):
+        config = Config.load(config_file)
+    assert not config.is_enabled("gcloud")
+
+
+def test_toml_config_disables_task(tmp_path):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('[tasks]\npnpm = false\n')
+
+    config = Config.load(config_file)
+    assert not config.is_enabled("pnpm")
+    assert config.is_enabled("gcloud")
+
+
+def test_brewfile_from_env(monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_BREWFILE", "/custom/Brewfile")
+    config = Config.load(Path("/nonexistent/config.toml"))
+    assert config.brewfile == "/custom/Brewfile"
+
+
+def test_brewfile_from_config(tmp_path):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('[paths]\nbrewfile = "/my/Brewfile"\n')
+
+    config = Config.load(config_file)
+    assert config.brewfile == "/my/Brewfile"

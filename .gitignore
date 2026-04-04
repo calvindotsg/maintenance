@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+dist/
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+coverage/
+.DS_Store
+.claude/worktrees/
+.venv/
