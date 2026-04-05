@@ -7,9 +7,11 @@ import os
 import re
 import shutil
 import subprocess
+import time
 from pathlib import Path
 
 from maintenance.config import Config
+from maintenance.output import TaskResult
 
 logger = logging.getLogger("maintenance")
 
@@ -42,28 +44,26 @@ def run_task(
     config: Config,
     dry_run: bool = False,
     needs_sudo: bool = False,
-) -> bool:
-    """Execute a maintenance task with auto-detection and graceful failure.
-
-    Returns True if the task ran successfully, False if skipped or failed.
-    """
+) -> TaskResult:
+    """Execute a maintenance task with auto-detection and graceful failure."""
     task_key = name.lower().replace(" ", "_")
 
     if not config.is_enabled(task_key):
         logger.info("SKIP: %s (disabled in config)", name)
-        return False
+        return TaskResult(name, "skipped", reason="disabled")
 
     # Check if the primary command exists
     primary_cmd = cmd[0] if not needs_sudo else cmd[2]  # skip sudo -n
     if not shutil.which(primary_cmd):
         logger.info("SKIP: %s (%s not installed)", name, primary_cmd)
-        return False
+        return TaskResult(name, "skipped", reason="not installed")
 
     if dry_run:
         logger.info("DRY-RUN: would run %s", name)
-        return True
+        return TaskResult(name, "ok", reason="dry-run")
 
     logger.info("Running %s...", name)
+    start = time.monotonic()
     try:
         result = subprocess.run(
             cmd,
@@ -71,28 +71,33 @@ def run_task(
             text=True,
             timeout=300,
         )
+        duration = time.monotonic() - start
         output = strip_ansi(result.stdout + result.stderr).strip()
         if output:
             for line in output.splitlines():
                 logger.debug("  %s", line)
         if result.returncode != 0:
             logger.warning("%s exited with code %d", name, result.returncode)
-            return False
+            return TaskResult(
+                name, "failed", reason=f"exit code {result.returncode}", duration=duration
+            )
     except subprocess.TimeoutExpired:
+        duration = time.monotonic() - start
         logger.warning("%s timed out after 300s", name)
-        return False
+        return TaskResult(name, "failed", reason="timed out", duration=duration)
     except subprocess.CalledProcessError as e:
+        duration = time.monotonic() - start
         logger.warning("%s failed: %s", name, strip_ansi(e.stderr or str(e)))
-        return False
+        return TaskResult(name, "failed", reason=str(e), duration=duration)
 
-    return True
+    return TaskResult(name, "ok", duration=duration)
 
 
-def run_all_tasks(*, config: Config, dry_run: bool = False) -> dict[str, str]:
-    """Run all maintenance tasks in order. Returns task → status mapping."""
+def run_all_tasks(*, config: Config, dry_run: bool = False) -> list[TaskResult]:
+    """Run all maintenance tasks in order. Returns list of task results."""
     brew_prefix = get_brew_prefix()
     mo_bin = f"{brew_prefix}/bin/mo"
-    results: dict[str, str] = {}
+    results: list[TaskResult] = []
 
     tasks = [
         ("gcloud", ["gcloud", "components", "update", "--quiet"]),
@@ -103,8 +108,7 @@ def run_all_tasks(*, config: Config, dry_run: bool = False) -> dict[str, str]:
     ]
 
     for name, cmd in tasks:
-        ok = run_task(name, cmd, config=config, dry_run=dry_run)
-        results[name] = "ok" if ok else "skipped"
+        results.append(run_task(name, cmd, config=config, dry_run=dry_run))
 
     # sudo tasks: env_keep in sudoers preserves HOME (not /var/root)
     sudo_tasks = [
@@ -112,37 +116,38 @@ def run_all_tasks(*, config: Config, dry_run: bool = False) -> dict[str, str]:
         ("mo_optimize", [mo_bin, "optimize"]),
     ]
     for name, cmd in sudo_tasks:
-        ok = run_task(
-            name,
-            ["sudo", "-n"] + cmd,
-            config=config,
-            dry_run=dry_run,
-            needs_sudo=True,
+        results.append(
+            run_task(
+                name,
+                ["sudo", "-n"] + cmd,
+                config=config,
+                dry_run=dry_run,
+                needs_sudo=True,
+            )
         )
-        results[name] = "ok" if ok else "skipped"
 
     # mo purge: no sudo, permanent rm -rf, no age threshold
-    ok = run_task("mo_purge", [mo_bin, "purge"], config=config, dry_run=dry_run)
-    results["mo_purge"] = "ok" if ok else "skipped"
+    results.append(run_task("mo_purge", [mo_bin, "purge"], config=config, dry_run=dry_run))
 
     # brew bundle cleanup: runs last (mo clean runs autoremove — homebrew/brew#21350)
     if config.is_enabled("brew_bundle"):
         if not config.brewfile or not Path(config.brewfile).is_file():
             logger.info("SKIP: brew_bundle (no Brewfile found)")
-            results["brew_bundle"] = "skipped"
+            results.append(TaskResult("brew_bundle", "skipped", reason="no Brewfile found"))
         elif dry_run:
             logger.info("DRY-RUN: would run brew_bundle")
-            results["brew_bundle"] = "ok"
+            results.append(TaskResult("brew_bundle", "ok", reason="dry-run"))
         else:
-            ok = run_task(
-                "brew_bundle",
-                ["brew", "bundle", "cleanup", "--force", f"--file={config.brewfile}"],
-                config=config,
-                dry_run=False,
+            results.append(
+                run_task(
+                    "brew_bundle",
+                    ["brew", "bundle", "cleanup", "--force", f"--file={config.brewfile}"],
+                    config=config,
+                    dry_run=False,
+                )
             )
-            results["brew_bundle"] = "ok" if ok else "skipped"
     else:
         logger.info("SKIP: brew_bundle (disabled in config)")
-        results["brew_bundle"] = "skipped"
+        results.append(TaskResult("brew_bundle", "skipped", reason="disabled"))
 
     return results

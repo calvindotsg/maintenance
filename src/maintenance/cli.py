@@ -94,9 +94,16 @@ def run(
 
     results = run_all_tasks(config=config, dry_run=dry_run)
 
-    ok_count = sum(1 for v in results.values() if v == "ok")
-    skip_count = sum(1 for v in results.values() if v == "skipped")
-    logger.info("Maintenance complete: %d ran, %d skipped.", ok_count, skip_count)
+    ok_count = sum(1 for r in results if r.status == "ok")
+    skip_count = sum(1 for r in results if r.status == "skipped")
+    fail_count = sum(1 for r in results if r.status == "failed")
+    if fail_count:
+        logger.info(
+            "Maintenance complete: %d ran, %d skipped, %d failed.",
+            ok_count, skip_count, fail_count,
+        )
+    else:
+        logger.info("Maintenance complete: %d ran, %d skipped.", ok_count, skip_count)
 
 
 @app.command()
