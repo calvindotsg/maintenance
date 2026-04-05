@@ -15,3 +15,9 @@
 [paths]
 # Brewfile path (auto-detected from common locations if unset)
 # brewfile = "~/.config/Brewfile"
+
+[notifications]
+# macOS notification on completion (non-interactive/launchd runs only)
+# Override via MAINTENANCE_NOTIFY=false environment variable
+# enabled = true
+# sound = "Submarine"  # set to "" for silent

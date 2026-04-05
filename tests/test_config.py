@@ -57,3 +57,31 @@ def test_brewfile_from_config(tmp_path):
 
     config = Config.load(config_file)
     assert config.brewfile == "/my/Brewfile"
+
+
+def test_notify_defaults_to_true():
+    config = Config.load(Path("/nonexistent/config.toml"))
+    assert config.notify is True
+    assert config.notify_sound == "Submarine"
+
+
+def test_notify_from_toml(tmp_path):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('[notifications]\nenabled = false\nsound = "Glass"\n')
+    config = Config.load(config_file)
+    assert config.notify is False
+    assert config.notify_sound == "Glass"
+
+
+def test_notify_env_var_disables(monkeypatch):
+    monkeypatch.setenv("MAINTENANCE_NOTIFY", "false")
+    config = Config.load(Path("/nonexistent/config.toml"))
+    assert config.notify is False
+
+
+def test_notify_env_var_overrides_toml(tmp_path, monkeypatch):
+    config_file = tmp_path / "config.toml"
+    config_file.write_text('[notifications]\nenabled = true\n')
+    monkeypatch.setenv("MAINTENANCE_NOTIFY", "0")
+    config = Config.load(config_file)
+    assert config.notify is False

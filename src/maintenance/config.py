@@ -30,6 +30,8 @@ class Config:
 
     tasks: dict[str, bool] = field(default_factory=lambda: dict(DEFAULT_TASKS))
     brewfile: str | None = None
+    notify: bool = True
+    notify_sound: str = "Submarine"
 
     @classmethod
     def load(cls, path: Path = DEFAULT_CONFIG_PATH) -> Config:
@@ -46,6 +48,12 @@ class Config:
                         config.tasks[task] = bool(enabled)
             if "paths" in data and "brewfile" in data["paths"]:
                 config.brewfile = data["paths"]["brewfile"]
+            if "notifications" in data:
+                notif = data["notifications"]
+                if "enabled" in notif:
+                    config.notify = bool(notif["enabled"])
+                if "sound" in notif:
+                    config.notify_sound = str(notif["sound"])
 
         # Environment variables override config file
         for task in DEFAULT_TASKS:
@@ -53,6 +61,10 @@ class Config:
             env_val = os.environ.get(env_key)
             if env_val is not None:
                 config.tasks[task] = env_val.lower() not in ("false", "0", "no")
+
+        env_notify = os.environ.get("MAINTENANCE_NOTIFY")
+        if env_notify is not None:
+            config.notify = env_notify.lower() not in ("false", "0", "no")
 
         # Brewfile path: env var → config file → auto-discover
         if os.environ.get("MAINTENANCE_BREWFILE"):
