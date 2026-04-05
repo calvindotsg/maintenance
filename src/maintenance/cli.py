@@ -104,7 +104,10 @@ def setup() -> None:
     """Print sudoers rules for this machine.
 
     Generates machine-specific rules using your username and Homebrew prefix.
-    Pipe to sudoers: maintenance setup | sudo tee /etc/sudoers.d/maintenance
+    Pipe to sudoers::
+
+        maintenance setup | sudo tee /etc/sudoers.d/maintenance
+        sudo chmod 0440 /etc/sudoers.d/maintenance
 
     The env_keep line preserves HOME so mole operates on your home directory,
     not /var/root (which is the default when running via sudo).
@@ -114,7 +117,10 @@ def setup() -> None:
     mo_bin = f"{brew_prefix}/bin/mo"
 
     typer.echo(f"# Sudoers rules for maintenance CLI ({user}@{brew_prefix})")
-    typer.echo("# Install: maintenance setup | sudo tee /etc/sudoers.d/maintenance")
+    typer.echo(
+        "# Install: maintenance setup | sudo tee /etc/sudoers.d/maintenance"
+        " && sudo chmod 0440 /etc/sudoers.d/maintenance"
+    )
     typer.echo()
     typer.echo(f'Defaults!{mo_bin} env_keep += "HOME"')
     typer.echo(f"{user} ALL = (root) NOPASSWD: {mo_bin} clean")

@@ -80,7 +80,7 @@ MAINTENANCE_GCLOUD=false maintenance run
 `mo_clean` and `mo_optimize` require passwordless sudo for the `mo` binary:
 
 ```bash
-maintenance setup | sudo tee /etc/sudoers.d/maintenance
+maintenance setup | sudo tee /etc/sudoers.d/maintenance && sudo chmod 0440 /etc/sudoers.d/maintenance
 sudo visudo -c
 ```
 
