@@ -10,13 +10,16 @@
 | `uv run pytest` | Run tests |
 | `uv run pytest --cov` | Run tests with coverage |
 | `uv run maintenance run --dry-run` | Test CLI without side effects |
+| `uv run maintenance notify-test` | Verify macOS notification permissions |
 
 ## Architecture
 
 ```
-cli.py  → Typer app, subcommand dispatch, signal handling, logging setup
-tasks.py → run_task() helper, run_all_tasks() orchestrator, ANSI stripping
+cli.py    → Typer app, subcommand dispatch, signal handling, logging setup
+tasks.py  → run_task() helper, run_all_tasks() orchestrator, ANSI stripping
 config.py → TOML loading (tomllib), env var overrides, Brewfile discovery
+output.py → TaskResult dataclass, interactive/non-interactive output (Rich)
+notify.py → macOS notifications via osascript, summary formatting
 ```
 
 Entry point: `maintenance.cli:app` (registered in pyproject.toml `[project.scripts]`).
@@ -31,6 +34,10 @@ Entry point: `maintenance.cli:app` (registered in pyproject.toml `[project.scrip
 - **Task ordering**: `brew_bundle` runs last because `mo_clean` internally runs `brew autoremove`. Running bundle cleanup after avoids the [cascading removal bug](https://github.com/homebrew/brew/issues/21350).
 - **Brew prefix detection**: `subprocess.run(["brew", "--prefix"])` with architecture fallback. Portable across Apple Silicon and Intel.
 - **Missed schedules**: launchd catches up after sleep (coalesced). Powered off → skipped until next Monday.
+- **Interactive detection**: `sys.stdout.isatty()` switches between Rich console (interactive) and Python logging (non-interactive/launchd). Same code path, different presentation. Zero visual change to launchd logs.
+- **Rich is a transitive dependency**: `typer>=0.12` requires `rich>=12.3.0`. Homebrew formula already bundles it. Using Rich adds zero new runtime dependencies.
+- **osascript notifications**: `/usr/bin/osascript -e 'display notification ...'` works from launchd user agents. 5-second timeout, never fatal. Notification permissions may need granting in System Settings > Notifications.
+- **TaskResult over bool**: `run_task` returns a structured `TaskResult(name, status, reason, duration)` instead of `bool`. Enables distinct skip/fail reporting, per-task timing, and notification content — without coupling task execution to output formatting.
 
 ## Non-Obvious Constraints
 
@@ -39,12 +46,41 @@ Entry point: `maintenance.cli:app` (registered in pyproject.toml `[project.scrip
 - `mo_optimize` security fixes are auto-skipped in non-TTY contexts (read_key returns QUIT). Safe operations still run.
 - NOPASSWD in sudoers bypasses PAM entirely — no interaction with Touch ID (pam_tid) setup.
 - `check_touchid` is already whitelisted in mole's optimize whitelist, preventing false positive security fix suggestions.
+- `poet -r <package>` calls PyPI API for the main package. Fails if not published to PyPI. Tap workflow gracefully falls back to updating only URL/sha256 (resource blocks unchanged). `brew update-python-resources` is the Homebrew-native alternative but requires macOS + Homebrew on the CI runner.
+- **Node.js formulas don't need resource blocks** — npm resolves the full dependency tree at install time via `std_npm_args`. Only URL + sha256 need updating on release.
+- **`repository_dispatch` is fire-and-forget** — the source repo won't know if the tap update succeeded. Check the homebrew-tap Actions tab after a release to verify.
 
 ## Release Process
 
-Automated via release-please:
+Automated via release-please + homebrew-tap dispatch:
 
 1. Commit changes using conventional commits, push to main
 2. release-please creates a release PR (bumps version in `pyproject.toml`, updates CHANGELOG.md)
-3. Merge the release PR → GitHub release + tag created
-4. Update `homebrew-tap` formula: compute new sha256, update `Formula/maintenance.rb`
+3. Merge the release PR → GitHub release + tag created → `bump-tap` job dispatches to homebrew-tap automatically
+4. Verify: check homebrew-tap Actions tab for successful formula update
+
+## Reusable Patterns
+
+This repo serves as a reference for Python CLI projects using Typer + UV.
+
+**Copy directly** (adjust versions/paths):
+- `.github/workflows/test.yml` — lint + test CI on macOS
+- `.github/workflows/release.yml` — release-please with GitHub App token + tap dispatch
+- `release-please-config.json` — changelog sections for conventional commits
+- `pyproject.toml` structure — Hatchling build, Ruff lint+format, pytest config
+- `CONTRIBUTING.md` — dev setup, commit conventions, PR process
+
+**Follow structure:**
+- CLAUDE.md: quick commands → architecture → key patterns → constraints → release → reusable patterns
+- README.md: install → tasks → usage → config → prerequisites
+- Config pattern: TOML file + env var overrides + auto-discovery fallback chain
+
+**Adapt:**
+- Rich dual-mode output (`isatty()` detection) for any CLI running interactively AND via scheduler
+- osascript notifications for any macOS launchd service needing user feedback
+- `repository_dispatch` + GitHub App for cross-repo automation across multiple source repos
+
+**Project-specific (do not copy):**
+- Mole CLI wrapper and sudo/HOME/sudoers configuration
+- Task auto-detection via `shutil.which()` (specific to multi-tool orchestrator)
+- Homebrew tap formula + poet resource regeneration

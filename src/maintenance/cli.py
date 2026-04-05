@@ -15,6 +15,8 @@ from typing import Annotated
 import typer
 
 from maintenance.config import Config
+from maintenance.notify import format_summary, notify
+from maintenance.output import Output
 from maintenance.tasks import get_brew_prefix, run_all_tasks
 
 app = typer.Typer(
@@ -86,17 +88,32 @@ def run(
     Exit codes: 0 = completed (some tasks may be skipped), 130 = interrupted.
     """
     _setup_logging(debug)
-    logger = logging.getLogger("maintenance")
-
     config = Config.load()
-    suffix = " (dry-run)" if dry_run else ""
-    logger.info("Starting maintenance%s...", suffix)
+    output = Output(debug=debug)
 
-    results = run_all_tasks(config=config, dry_run=dry_run)
+    output.header(dry_run=dry_run)
+    results = run_all_tasks(config=config, output=output, dry_run=dry_run)
+    output.summary(results)
 
-    ok_count = sum(1 for v in results.values() if v == "ok")
-    skip_count = sum(1 for v in results.values() if v == "skipped")
-    logger.info("Maintenance complete: %d ran, %d skipped.", ok_count, skip_count)
+    if not output.interactive and config.notify and not dry_run:
+        title, message, subtitle = format_summary(results)
+        notify(title, message, subtitle=subtitle, sound=config.notify_sound)
+
+
+@app.command(name="notify-test")
+def notify_test() -> None:
+    """Send a test notification to verify macOS permissions.
+
+    Useful after initial setup to confirm notifications are allowed in
+    System Settings > Notifications.
+    """
+    config = Config.load()
+    ok = notify("Maintenance", "Test notification", sound=config.notify_sound)
+    if ok:
+        typer.echo("Notification sent. Check your notification center.")
+    else:
+        typer.echo("Notification failed. Check System Settings > Notifications.")
+        raise typer.Exit(1)
 
 
 @app.command()

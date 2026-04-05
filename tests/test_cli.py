@@ -32,3 +32,19 @@ def test_setup_outputs_sudoers():
 def test_run_dry_run():
     result = runner.invoke(app, ["run", "--dry-run"])
     assert result.exit_code == 0
+
+
+def test_notify_test_command_succeeds():
+    from unittest.mock import patch
+    with patch("maintenance.cli.notify", return_value=True):
+        result = runner.invoke(app, ["notify-test"])
+    assert result.exit_code == 0
+    assert "Notification sent" in result.output
+
+
+def test_notify_test_command_fails():
+    from unittest.mock import patch
+    with patch("maintenance.cli.notify", return_value=False):
+        result = runner.invoke(app, ["notify-test"])
+    assert result.exit_code == 1
+    assert "Notification failed" in result.output
