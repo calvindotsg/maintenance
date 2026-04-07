@@ -33,6 +33,7 @@ def _non_interactive(debug: bool = False) -> Output:
 
 def test_output_non_interactive_header(caplog):
     import logging
+
     output = _non_interactive()
     with caplog.at_level(logging.INFO, logger="maintenance"):
         output.header(dry_run=False)
@@ -41,6 +42,7 @@ def test_output_non_interactive_header(caplog):
 
 def test_output_non_interactive_header_dry_run(caplog):
     import logging
+
     output = _non_interactive()
     with caplog.at_level(logging.INFO, logger="maintenance"):
         output.header(dry_run=True)
@@ -49,6 +51,7 @@ def test_output_non_interactive_header_dry_run(caplog):
 
 def test_output_non_interactive_task_done_ok(caplog):
     import logging
+
     output = _non_interactive()
     result = TaskResult("gcloud", "ok", duration=2.5)
     with caplog.at_level(logging.INFO, logger="maintenance"):
@@ -58,6 +61,7 @@ def test_output_non_interactive_task_done_ok(caplog):
 
 def test_output_non_interactive_task_done_dry_run(caplog):
     import logging
+
     output = _non_interactive()
     result = TaskResult("gcloud", "ok", reason="dry-run")
     with caplog.at_level(logging.INFO, logger="maintenance"):
@@ -67,6 +71,7 @@ def test_output_non_interactive_task_done_dry_run(caplog):
 
 def test_output_non_interactive_task_done_skipped(caplog):
     import logging
+
     output = _non_interactive()
     result = TaskResult("uv", "skipped", reason="not installed")
     with caplog.at_level(logging.INFO, logger="maintenance"):
@@ -77,6 +82,7 @@ def test_output_non_interactive_task_done_skipped(caplog):
 
 def test_output_non_interactive_task_done_failed(caplog):
     import logging
+
     output = _non_interactive()
     result = TaskResult("mo_clean", "failed", reason="exit code 1")
     with caplog.at_level(logging.WARNING, logger="maintenance"):
@@ -86,6 +92,7 @@ def test_output_non_interactive_task_done_failed(caplog):
 
 def test_output_non_interactive_summary_no_failures(caplog):
     import logging
+
     output = _non_interactive()
     output._wall_start = __import__("time").monotonic() - 5
     results = [
@@ -100,6 +107,7 @@ def test_output_non_interactive_summary_no_failures(caplog):
 
 def test_output_non_interactive_summary_with_failures(caplog):
     import logging
+
     output = _non_interactive()
     output._wall_start = __import__("time").monotonic() - 5
     results = [
