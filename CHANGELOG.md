@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2](https://github.com/calvindotsg/maintenance/compare/v1.2.1...v1.2.2) (2026-04-07)
+
+
+### CI/CD
+
+* keep uv.lock in sync with release-please version bumps ([#10](https://github.com/calvindotsg/maintenance/issues/10)) ([d6a81a9](https://github.com/calvindotsg/maintenance/commit/d6a81a9c72cb3a764708d74e505b0f5a86a14697))
+
 ## [1.2.1](https://github.com/calvindotsg/maintenance/compare/v1.2.0...v1.2.1) (2026-04-07)
 
 
