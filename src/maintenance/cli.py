@@ -15,14 +15,14 @@ from typing import Annotated
 import typer
 
 from maintenance.config import Config
-from maintenance.notify import format_summary, notify
+from maintenance.notify import detect_terminal_bundle_id, format_summary, notify
 from maintenance.output import Output
-from maintenance.tasks import get_brew_prefix, run_all_tasks
+from maintenance.tasks import ALL_TASK_NAMES, get_brew_prefix, run_all_tasks
 
 app = typer.Typer(
     help="Automated macOS maintenance CLI.\n\n"
-    "Runs 8 tasks: gcloud, pnpm, uv, fisher, "
-    "mo clean/optimize/purge, brew bundle cleanup.\n\n"
+    "Runs 11 tasks: brew update/upgrade, gcloud, pnpm, uv, fisher, "
+    "mo clean/optimize/purge, brew cleanup, brew bundle cleanup.\n\n"
     "Install: brew install calvindotsg/tap/maintenance\n\n"
     "Schedule: brew services start maintenance (Monday 12 PM weekly)\n\n"
     "Config: ~/.config/maintenance/config.toml",
@@ -76,14 +76,24 @@ def run(
         bool, typer.Option("--dry-run", "-n", help="Preview tasks without executing.")
     ] = False,
     debug: Annotated[bool, typer.Option("--debug", help="Show detailed debug output.")] = False,
+    force: Annotated[
+        list[str] | None,
+        typer.Option(
+            "--force",
+            "-f",
+            help="Force task(s) ignoring schedule. Repeat for multiple. Use 'all' for all.",
+        ),
+    ] = None,
 ) -> None:
     """Run all maintenance tasks.
 
     Tasks are auto-detected: missing tools are skipped with a log message.
     Disable specific tasks via config file or MAINTENANCE_<TASK>=false environment variables.
 
-    Task order: gcloud, pnpm, uv, fisher, mo_clean, mo_optimize, mo_purge, brew_bundle.
-    brew_bundle runs last because mo_clean internally runs brew autoremove.
+    Task order: brew_update, brew_upgrade, gcloud, pnpm, uv, fisher,
+    mo_clean, mo_optimize, mo_purge, brew_cleanup, brew_bundle.
+    brew_cleanup runs after mo_clean (which runs brew autoremove).
+    brew_bundle runs last (homebrew/brew#21350).
 
     Exit codes: 0 = completed (some tasks may be skipped), 130 = interrupted.
     """
@@ -91,13 +101,36 @@ def run(
     config = Config.load()
     output = Output(debug=debug)
 
-    output.header(dry_run=dry_run)
-    results = run_all_tasks(config=config, output=output, dry_run=dry_run)
+    # Validate and convert --force option
+    force_set: set[str] | None = None
+    if force is not None:
+        valid_names = set(ALL_TASK_NAMES)
+        if "all" in force:
+            force_set = valid_names
+        else:
+            invalid = [t for t in force if t not in valid_names]
+            if invalid:
+                typer.echo(f"Unknown task(s): {', '.join(invalid)}", err=True)
+                raise typer.Exit(1)
+            force_set = set(force)
+
+    output.header(dry_run=dry_run, task_names=ALL_TASK_NAMES)
+    results = run_all_tasks(config=config, output=output, dry_run=dry_run, force_tasks=force_set)
     output.summary(results)
 
-    if not output.interactive and config.notify and not dry_run:
+    if config.notify and not dry_run:
         title, message, subtitle = format_summary(results)
-        notify(title, message, subtitle=subtitle, sound=config.notify_sound)
+        brew_prefix = get_brew_prefix()
+        log_url = f"file://{brew_prefix}/var/log/maintenance.log"
+        bundle_id = detect_terminal_bundle_id()
+        notify(
+            title,
+            message,
+            subtitle=subtitle,
+            sound=config.notify_sound,
+            activate_bundle_id=bundle_id,
+            open_url=log_url,
+        )
 
 
 @app.command(name="notify-test")
@@ -108,7 +141,16 @@ def notify_test() -> None:
     System Settings > Notifications.
     """
     config = Config.load()
-    ok = notify("Maintenance", "Test notification", sound=config.notify_sound)
+    brew_prefix = get_brew_prefix()
+    bundle_id = detect_terminal_bundle_id()
+    log_url = f"file://{brew_prefix}/var/log/maintenance.log"
+    ok = notify(
+        "Maintenance",
+        "Test notification",
+        sound=config.notify_sound,
+        activate_bundle_id=bundle_id,
+        open_url=log_url,
+    )
     if ok:
         typer.echo("Notification sent. Check your notification center.")
     else:
@@ -142,6 +184,11 @@ def setup() -> None:
     typer.echo(f'Defaults!{mo_bin} env_keep += "HOME"')
     typer.echo(f"{user} ALL = (root) NOPASSWD: {mo_bin} clean")
     typer.echo(f"{user} ALL = (root) NOPASSWD: {mo_bin} optimize")
+    typer.echo()
+    typer.echo("# Log rotation (install separately):")
+    log_path = f"{brew_prefix}/var/log/maintenance.log"
+    typer.echo(f"# echo '{log_path}  {user}:admin  644  12  *  $M1D0  GN'")
+    typer.echo("#   | sudo tee /etc/newsyslog.d/maintenance.conf")
 
 
 @app.command()

@@ -36,6 +36,7 @@ def test_run_dry_run():
 
 def test_notify_test_command_succeeds():
     from unittest.mock import patch
+
     with patch("maintenance.cli.notify", return_value=True):
         result = runner.invoke(app, ["notify-test"])
     assert result.exit_code == 0
@@ -44,6 +45,7 @@ def test_notify_test_command_succeeds():
 
 def test_notify_test_command_fails():
     from unittest.mock import patch
+
     with patch("maintenance.cli.notify", return_value=False):
         result = runner.invoke(app, ["notify-test"])
     assert result.exit_code == 1

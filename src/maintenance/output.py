@@ -10,11 +10,11 @@ from dataclasses import dataclass, field
 logger = logging.getLogger("maintenance")
 
 # Icons
-_OK = "\u2713"       # ✓
-_SKIP = "\u25cb"     # ○
-_FAIL = "\u2717"     # ✗
-_DRY = "\u2192"      # →
-_BULLET = "\u2022"   # •
+_OK = "\u2713"  # ✓
+_SKIP = "\u25cb"  # ○
+_FAIL = "\u2717"  # ✗
+_DRY = "\u2192"  # →
+_BULLET = "\u2022"  # •
 
 
 @dataclass
@@ -28,63 +28,113 @@ class TaskResult:
 
 
 @dataclass
+class _TaskState:
+    """Internal state for a single task in the live TUI table."""
+
+    name: str
+    status: str = "pending"  # pending, running, ok, skipped, failed
+    reason: str = ""
+    duration: float = 0.0
+
+
+@dataclass
 class Output:
     """Adaptive output: Rich in interactive terminals, plain logging for launchd."""
 
     interactive: bool = field(default_factory=lambda: sys.stdout.isatty())
     debug: bool = False
     _console: object = field(default=None, init=False, repr=False)
-    _status_ctx: object = field(default=None, init=False, repr=False)
+    _live: object = field(default=None, init=False, repr=False)
+    _task_states: list = field(default_factory=list, init=False, repr=False)
+    _dry_run: bool = field(default=False, init=False, repr=False)
+    _current_debug_task: str = field(default="", init=False, repr=False)
     _wall_start: float = field(default=0.0, init=False, repr=False)
 
     def __post_init__(self) -> None:
         if self.interactive:
             from rich.console import Console
+
             self._console = Console(highlight=False)
 
-    def header(self, *, dry_run: bool = False) -> None:
+    def header(self, *, dry_run: bool = False, task_names: list[str] | None = None) -> None:
+        self._dry_run = dry_run
         suffix = " (dry-run)" if dry_run else ""
         if self.interactive:
-            from rich.text import Text
-            header = Text(f"Maintenance{suffix}", style="bold")
-            self._console.print(header)
-            self._console.print()
+            if task_names:
+                self._task_states = [_TaskState(name=n) for n in task_names]
+                from rich.live import Live
+
+                self._live = Live(
+                    self._generate_table(), refresh_per_second=4, console=self._console
+                )
+                self._live.__enter__()
+            else:
+                from rich.text import Text
+
+                self._console.print(Text(f"Maintenance{suffix}", style="bold"))
+                self._console.print()
         else:
             logger.info("Starting maintenance%s...", suffix)
         self._wall_start = time.monotonic()
 
+    def _generate_table(self) -> object:
+        """Build a Rich Table from current task states."""
+        from rich.spinner import Spinner
+        from rich.table import Table
+        from rich.text import Text
+
+        completed = sum(1 for t in self._task_states if t.status not in ("pending", "running"))
+        total = len(self._task_states)
+        suffix = " (dry-run)" if self._dry_run else ""
+        title = f"Maintenance{suffix} [{completed}/{total}]"
+
+        table = Table(title=title, title_style="bold", show_header=False, box=None, padding=(0, 2))
+        table.add_column("icon", width=2)
+        table.add_column("name", min_width=16)
+        table.add_column("detail", min_width=20)
+
+        for t in self._task_states:
+            if t.status == "running":
+                icon = Spinner("dots", style="yellow")
+                detail = Text("running", style="yellow")
+            elif t.status == "ok" and t.reason == "dry-run":
+                icon = Text(_DRY, style="cyan")
+                detail = Text("dry-run", style="dim")
+            elif t.status == "ok":
+                icon = Text(_OK, style="green")
+                detail = Text(f"{t.duration:.1f}s", style="dim") if t.duration else Text("")
+            elif t.status == "skipped":
+                icon = Text(_SKIP, style="dim")
+                detail = Text(t.reason, style="dim")
+            elif t.status == "failed":
+                icon = Text(_FAIL, style="red")
+                detail = Text(t.reason, style="red")
+            else:
+                icon = Text(_BULLET, style="dim")
+                detail = Text("pending", style="dim")
+            table.add_row(icon, t.name, detail)
+        return table
+
     def task_start(self, name: str) -> None:
         if self.interactive:
-            from rich.status import Status  # noqa: F401
-            self._status_ctx = self._console.status(
-                f"[bold]Running {name}...[/bold]",
-                spinner="dots",
-            )
-            self._status_ctx.__enter__()
+            if self._live is not None:
+                for t in self._task_states:
+                    if t.name == name:
+                        t.status = "running"
+                        break
+                self._live.update(self._generate_table())
         # Non-interactive: no log here; task_done handles all messages
 
     def task_done(self, result: TaskResult) -> None:
         if self.interactive:
-            if self._status_ctx is not None:
-                self._status_ctx.__exit__(None, None, None)
-                self._status_ctx = None
-
-            if result.status == "ok":
-                if result.reason == "dry-run":
-                    icon = f"[cyan]{_DRY}[/cyan]"
-                    detail = "[dim]dry-run[/dim]"
-                else:
-                    icon = f"[green]{_OK}[/green]"
-                    detail = f"[dim]{result.duration:.1f}s[/dim]" if result.duration else ""
-            elif result.status == "skipped":
-                icon = f"[dim]{_SKIP}[/dim]"
-                detail = f"[dim]skipped ({result.reason})[/dim]"
-            else:  # failed
-                icon = f"[red]{_FAIL}[/red]"
-                detail = f"[red]{result.reason}[/red]"
-
-            name_col = f"{result.name:<20}"
-            self._console.print(f"  {icon} {name_col}  {detail}")
+            if self._live is not None:
+                for t in self._task_states:
+                    if t.name == result.name:
+                        t.status = result.status
+                        t.reason = result.reason
+                        t.duration = result.duration
+                        break
+                self._live.update(self._generate_table())
         else:
             if result.status == "skipped":
                 logger.info("SKIP: %s (%s)", result.name, result.reason)
@@ -98,7 +148,14 @@ class Output:
 
     def task_debug(self, line: str) -> None:
         if self.interactive:
-            self._console.log(f"  [dim]{line}[/dim]")
+            if self._live is not None:
+                running = next((t.name for t in self._task_states if t.status == "running"), "")
+                if running and self._current_debug_task != running:
+                    self._current_debug_task = running
+                    self._live.console.print(f"\n  [dim]── {running} ──[/dim]")
+                self._live.console.print(f"  [dim]{line}[/dim]")
+            else:
+                self._console.log(f"  [dim]{line}[/dim]")
         else:
             logger.debug("  %s", line)
 
@@ -109,35 +166,41 @@ class Output:
         wall = time.monotonic() - self._wall_start
 
         if self.interactive:
+            # Exit Live context
+            if self._live is not None:
+                self._live.__exit__(None, None, None)
+                self._live = None
+
             from rich.rule import Rule
 
             self._console.print()
             self._console.print(Rule(style="dim"))
 
             if failed:
-                style = "bold red"
                 summary_line = (
                     f"Maintenance finished with errors: "
                     f"{len(ok)} ran, {len(skipped)} skipped, {len(failed)} failed  "
                     f"[dim]{wall:.1f}s[/dim]"
                 )
+                self._console.print(f"  [red]{summary_line}[/]")
+                for r in failed:
+                    self._console.print(f"    [red]{_FAIL}[/red] {r.name} — {r.reason}")
             else:
-                style = "bold green"
                 summary_line = (
                     f"Maintenance complete: "
                     f"{len(ok)} ran, {len(skipped)} skipped  "
                     f"[dim]{wall:.1f}s[/dim]"
                 )
+                self._console.print(f"  [green]{summary_line}[/]")
 
-            self._console.print(f"  [{style.split()[1]}]{summary_line}[/]")
-            for r in failed:
-                self._console.print(f"    [red]{_FAIL}[/red] {r.name} — {r.reason}")
             self._console.print(Rule(style="dim"))
         else:
             if failed:
                 logger.info(
                     "Maintenance complete: %d ran, %d skipped, %d failed.",
-                    len(ok), len(skipped), len(failed),
+                    len(ok),
+                    len(skipped),
+                    len(failed),
                 )
             else:
                 logger.info("Maintenance complete: %d ran, %d skipped.", len(ok), len(skipped))
