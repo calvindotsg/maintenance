@@ -7,7 +7,7 @@ import sys
 import time
 from dataclasses import dataclass, field
 
-logger = logging.getLogger("maintenance")
+logger = logging.getLogger("mac_upkeep")
 
 # Icons
 _OK = "\u2713"  # ✓
@@ -19,7 +19,7 @@ _BULLET = "\u2022"  # •
 
 @dataclass
 class TaskResult:
-    """Result of a single maintenance task."""
+    """Result of a single mac-upkeep task."""
 
     name: str
     status: str  # "ok", "skipped", "failed"
@@ -74,7 +74,7 @@ class Output:
                 self._console.print(Text(f"Maintenance{suffix}", style="bold"))
                 self._console.print()
         else:
-            logger.info("Starting maintenance%s...", suffix)
+            logger.info("Starting mac-upkeep%s...", suffix)
         self._wall_start = time.monotonic()
 
     def _generate_table(self) -> object:
@@ -178,7 +178,7 @@ class Output:
 
             if failed:
                 summary_line = (
-                    f"Maintenance finished with errors: "
+                    f"mac-upkeep finished with errors: "
                     f"{len(ok)} ran, {len(skipped)} skipped, {len(failed)} failed  "
                     f"[dim]{wall:.1f}s[/dim]"
                 )
@@ -187,7 +187,7 @@ class Output:
                     self._console.print(f"    [red]{_FAIL}[/red] {r.name} — {r.reason}")
             else:
                 summary_line = (
-                    f"Maintenance complete: "
+                    f"mac-upkeep complete: "
                     f"{len(ok)} ran, {len(skipped)} skipped  "
                     f"[dim]{wall:.1f}s[/dim]"
                 )
@@ -197,10 +197,10 @@ class Output:
         else:
             if failed:
                 logger.info(
-                    "Maintenance complete: %d ran, %d skipped, %d failed.",
+                    "mac-upkeep complete: %d ran, %d skipped, %d failed.",
                     len(ok),
                     len(skipped),
                     len(failed),
                 )
             else:
-                logger.info("Maintenance complete: %d ran, %d skipped.", len(ok), len(skipped))
+                logger.info("mac-upkeep complete: %d ran, %d skipped.", len(ok), len(skipped))

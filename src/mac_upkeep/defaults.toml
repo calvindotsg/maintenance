@@ -1,5 +1,5 @@
-# Built-in task definitions for maintenance.
-# Users override in ~/.config/maintenance/config.toml
+# Built-in task definitions for mac-upkeep.
+# Users override in ~/.config/mac-upkeep/config.toml
 
 [tasks.brew_update]
 description = "Update Homebrew package database"

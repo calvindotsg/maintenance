@@ -4,14 +4,14 @@ from __future__ import annotations
 
 from unittest.mock import MagicMock, patch
 
-from maintenance.notify import detect_terminal_bundle_id, format_summary, notify
-from maintenance.output import TaskResult
+from mac_upkeep.notify import detect_terminal_bundle_id, format_summary, notify
+from mac_upkeep.output import TaskResult
 
 
 def test_notify_sends_osascript_when_no_terminal_notifier():
     with (
-        patch("maintenance.notify.shutil.which", return_value=None),
-        patch("maintenance.notify.subprocess.run") as mock_run,
+        patch("mac_upkeep.notify.shutil.which", return_value=None),
+        patch("mac_upkeep.notify.subprocess.run") as mock_run,
     ):
         mock_run.return_value = MagicMock(returncode=0)
         result = notify("Title", "Message")
@@ -27,8 +27,8 @@ def test_notify_sends_osascript_when_no_terminal_notifier():
 
 def test_notify_includes_subtitle():
     with (
-        patch("maintenance.notify.shutil.which", return_value=None),
-        patch("maintenance.notify.subprocess.run") as mock_run,
+        patch("mac_upkeep.notify.shutil.which", return_value=None),
+        patch("mac_upkeep.notify.subprocess.run") as mock_run,
     ):
         mock_run.return_value = MagicMock(returncode=0)
         notify("T", "M", subtitle="sub")
@@ -39,8 +39,8 @@ def test_notify_includes_subtitle():
 
 def test_notify_includes_sound():
     with (
-        patch("maintenance.notify.shutil.which", return_value=None),
-        patch("maintenance.notify.subprocess.run") as mock_run,
+        patch("mac_upkeep.notify.shutil.which", return_value=None),
+        patch("mac_upkeep.notify.subprocess.run") as mock_run,
     ):
         mock_run.return_value = MagicMock(returncode=0)
         notify("T", "M", sound="Glass")
@@ -51,8 +51,8 @@ def test_notify_includes_sound():
 
 def test_notify_omits_sound_when_empty():
     with (
-        patch("maintenance.notify.shutil.which", return_value=None),
-        patch("maintenance.notify.subprocess.run") as mock_run,
+        patch("mac_upkeep.notify.shutil.which", return_value=None),
+        patch("mac_upkeep.notify.subprocess.run") as mock_run,
     ):
         mock_run.return_value = MagicMock(returncode=0)
         notify("T", "M", sound="")
@@ -62,8 +62,8 @@ def test_notify_omits_sound_when_empty():
 
 def test_notify_returns_false_on_exception():
     with (
-        patch("maintenance.notify.shutil.which", return_value=None),
-        patch("maintenance.notify.subprocess.run", side_effect=Exception("fail")),
+        patch("mac_upkeep.notify.shutil.which", return_value=None),
+        patch("mac_upkeep.notify.subprocess.run", side_effect=Exception("fail")),
     ):
         result = notify("T", "M")
     assert result is False
@@ -74,8 +74,8 @@ def test_notify_returns_false_on_timeout():
 
     err = subprocess.TimeoutExpired(cmd="osascript", timeout=5)
     with (
-        patch("maintenance.notify.shutil.which", return_value=None),
-        patch("maintenance.notify.subprocess.run", side_effect=err),
+        patch("mac_upkeep.notify.shutil.which", return_value=None),
+        patch("mac_upkeep.notify.subprocess.run", side_effect=err),
     ):
         result = notify("T", "M")
     assert result is False
@@ -84,7 +84,7 @@ def test_notify_returns_false_on_timeout():
 def test_format_summary_all_ok():
     results = [TaskResult("gcloud", "ok", duration=2.0), TaskResult("pnpm", "ok", duration=1.0)]
     title, message, subtitle = format_summary(results)
-    assert title == "Maintenance complete"
+    assert title == "mac-upkeep complete"
     assert "2 ran" in message
     assert subtitle == ""
 
@@ -95,7 +95,7 @@ def test_format_summary_mixed():
         TaskResult("uv", "skipped", reason="not installed"),
     ]
     title, message, subtitle = format_summary(results)
-    assert title == "Maintenance complete"
+    assert title == "mac-upkeep complete"
     assert "1 ran" in message
     assert "1 skipped" in message
 
@@ -123,8 +123,8 @@ def test_format_summary_excludes_dry_run_from_ok():
 
 def test_notify_uses_terminal_notifier():
     with (
-        patch("maintenance.notify.shutil.which", return_value="/usr/local/bin/terminal-notifier"),
-        patch("maintenance.notify.subprocess.run") as mock_run,
+        patch("mac_upkeep.notify.shutil.which", return_value="/usr/local/bin/terminal-notifier"),
+        patch("mac_upkeep.notify.subprocess.run") as mock_run,
     ):
         mock_run.return_value = MagicMock(returncode=0)
         result = notify(
@@ -142,19 +142,19 @@ def test_notify_uses_terminal_notifier():
     assert "-open" in cmd
     assert "file:///tmp/test.log" in cmd
     assert "-group" in cmd
-    assert "maintenance" in cmd
+    assert "mac-upkeep" in cmd
 
 
 def test_notify_terminal_notifier_includes_group():
     with (
-        patch("maintenance.notify.shutil.which", return_value="/usr/local/bin/terminal-notifier"),
-        patch("maintenance.notify.subprocess.run") as mock_run,
+        patch("mac_upkeep.notify.shutil.which", return_value="/usr/local/bin/terminal-notifier"),
+        patch("mac_upkeep.notify.subprocess.run") as mock_run,
     ):
         mock_run.return_value = MagicMock(returncode=0)
         notify("T", "M")
     cmd = mock_run.call_args[0][0]
     idx = cmd.index("-group")
-    assert cmd[idx + 1] == "maintenance"
+    assert cmd[idx + 1] == "mac-upkeep"
 
 
 def test_notify_falls_back_to_osascript_on_terminal_notifier_failure():
@@ -168,8 +168,8 @@ def test_notify_falls_back_to_osascript_on_terminal_notifier_failure():
         return MagicMock(returncode=0)
 
     with (
-        patch("maintenance.notify.shutil.which", return_value="/usr/local/bin/terminal-notifier"),
-        patch("maintenance.notify.subprocess.run", side_effect=side_effect),
+        patch("mac_upkeep.notify.shutil.which", return_value="/usr/local/bin/terminal-notifier"),
+        patch("mac_upkeep.notify.subprocess.run", side_effect=side_effect),
     ):
         result = notify("T", "M")
     assert result is True
@@ -187,8 +187,8 @@ def test_detect_bundle_id_cmux(monkeypatch):
 def test_detect_bundle_id_ghostty():
     with (
         patch.dict("os.environ", {}, clear=False),
-        patch("maintenance.notify.Path") as mock_path,
-        patch("maintenance.notify.subprocess.run") as mock_run,
+        patch("mac_upkeep.notify.Path") as mock_path,
+        patch("mac_upkeep.notify.subprocess.run") as mock_run,
     ):
         # Remove CMUX_BUNDLE_ID if present
         import os
@@ -202,7 +202,7 @@ def test_detect_bundle_id_ghostty():
 
 def test_detect_bundle_id_fallback(monkeypatch):
     monkeypatch.delenv("CMUX_BUNDLE_ID", raising=False)
-    with patch("maintenance.notify.Path") as mock_path:
+    with patch("mac_upkeep.notify.Path") as mock_path:
         mock_path.return_value.is_file.return_value = False
         result = detect_terminal_bundle_id()
     assert result == "com.apple.Terminal"

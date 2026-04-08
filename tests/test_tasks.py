@@ -7,9 +7,9 @@ import subprocess
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
-from maintenance.config import Config, TaskDef
-from maintenance.output import Output
-from maintenance.tasks import (
+from mac_upkeep.config import Config, TaskDef
+from mac_upkeep.output import Output
+from mac_upkeep.tasks import (
     _build_cmd,
     _run,
     _should_run,
@@ -91,7 +91,7 @@ def test_run_task_skips_disabled():
     assert result.reason == "disabled"
 
 
-@patch("maintenance.tasks.shutil.which", return_value=None)
+@patch("mac_upkeep.tasks.shutil.which", return_value=None)
 def test_run_task_skips_missing_command(mock_which):
     config = Config.load()
     result = run_task("gcloud", ["gcloud", "update"], config=config, detect="gcloud")
@@ -101,7 +101,7 @@ def test_run_task_skips_missing_command(mock_which):
 
 def test_run_task_dry_run_does_not_execute():
     config = Config.load()
-    with patch("maintenance.tasks.shutil.which", return_value="/usr/bin/gcloud"):
+    with patch("mac_upkeep.tasks.shutil.which", return_value="/usr/bin/gcloud"):
         result = run_task(
             "gcloud", ["gcloud", "update"], config=config, dry_run=True, detect="gcloud"
         )
@@ -109,8 +109,8 @@ def test_run_task_dry_run_does_not_execute():
     assert result.reason == "dry-run"
 
 
-@patch("maintenance.tasks.subprocess.run")
-@patch("maintenance.tasks.shutil.which", return_value="/usr/bin/echo")
+@patch("mac_upkeep.tasks.subprocess.run")
+@patch("mac_upkeep.tasks.shutil.which", return_value="/usr/bin/echo")
 def test_run_task_executes_command(mock_which, mock_run):
     mock_run.return_value = MagicMock(returncode=0, stdout="done", stderr="")
     config = Config.load()
@@ -124,8 +124,8 @@ def test_run_task_executes_command(mock_which, mock_run):
     assert task_call[1]["stdin"] == subprocess.DEVNULL
 
 
-@patch("maintenance.tasks.subprocess.run")
-@patch("maintenance.tasks.shutil.which", return_value="/usr/bin/echo")
+@patch("mac_upkeep.tasks.subprocess.run")
+@patch("mac_upkeep.tasks.shutil.which", return_value="/usr/bin/echo")
 def test_run_task_nonzero_exit_returns_failed(mock_which, mock_run):
     mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="error")
     config = Config.load()
@@ -135,8 +135,8 @@ def test_run_task_nonzero_exit_returns_failed(mock_which, mock_run):
     assert result.duration > 0
 
 
-@patch("maintenance.tasks.subprocess.run")
-@patch("maintenance.tasks.shutil.which", return_value="/usr/bin/echo")
+@patch("mac_upkeep.tasks.subprocess.run")
+@patch("mac_upkeep.tasks.shutil.which", return_value="/usr/bin/echo")
 def test_run_task_timeout_returns_failed(mock_which, mock_run):
     mock_run.side_effect = subprocess.TimeoutExpired(cmd="echo", timeout=300)
     config = Config.load()
@@ -145,8 +145,8 @@ def test_run_task_timeout_returns_failed(mock_which, mock_run):
     assert result.reason == "timed out"
 
 
-@patch("maintenance.tasks.subprocess.run")
-@patch("maintenance.tasks.shutil.which", return_value="/usr/bin/echo")
+@patch("mac_upkeep.tasks.subprocess.run")
+@patch("mac_upkeep.tasks.shutil.which", return_value="/usr/bin/echo")
 def test_run_task_uses_custom_timeout(mock_which, mock_run):
     mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
     config = Config.load()
@@ -158,7 +158,7 @@ def test_run_task_uses_custom_timeout(mock_which, mock_run):
 def test_run_task_detect_fallback_to_cmd0():
     """When detect is empty, falls back to cmd[0]."""
     config = Config.load()
-    with patch("maintenance.tasks.shutil.which", return_value=None) as mock_which:
+    with patch("mac_upkeep.tasks.shutil.which", return_value=None) as mock_which:
         result = run_task("test", ["nonexistent_binary"], config=config, detect="")
     mock_which.assert_called_with("nonexistent_binary")
     assert result.status == "skipped"
@@ -169,7 +169,7 @@ def test_run_task_detect_fallback_to_cmd0():
 
 
 def test_should_run_never_ran(tmp_path, monkeypatch):
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", tmp_path / "last-run.json")
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", tmp_path / "last-run.json")
     config = Config.load()
     assert _should_run("gcloud", config) is True
 
@@ -178,7 +178,7 @@ def test_should_run_within_threshold(tmp_path, monkeypatch):
     state_file = tmp_path / "last-run.json"
     recent = (datetime.now() - timedelta(days=2)).isoformat(timespec="seconds")
     state_file.write_text(json.dumps({"gcloud": recent}))
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
     config = Config.load()
     assert _should_run("gcloud", config) is False
 
@@ -188,7 +188,7 @@ def test_should_run_past_threshold(tmp_path, monkeypatch):
     # gcloud is monthly (threshold 27 days), so 30 days old should trigger
     old = (datetime.now() - timedelta(days=30)).isoformat(timespec="seconds")
     state_file.write_text(json.dumps({"gcloud": old}))
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
     config = Config.load()
     assert _should_run("gcloud", config) is True
 
@@ -197,7 +197,7 @@ def test_should_run_monthly_within_threshold(tmp_path, monkeypatch):
     state_file = tmp_path / "last-run.json"
     recent = (datetime.now() - timedelta(days=15)).isoformat(timespec="seconds")
     state_file.write_text(json.dumps({"gcloud": recent}))
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
     config = Config.load()
     assert _should_run("gcloud", config) is False
 
@@ -205,7 +205,7 @@ def test_should_run_monthly_within_threshold(tmp_path, monkeypatch):
 def test_should_run_corrupt_timestamp(tmp_path, monkeypatch):
     state_file = tmp_path / "last-run.json"
     state_file.write_text(json.dumps({"gcloud": "not-a-date"}))
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
     config = Config.load()
     assert _should_run("gcloud", config) is True
 
@@ -213,16 +213,16 @@ def test_should_run_corrupt_timestamp(tmp_path, monkeypatch):
 def test_should_run_corrupt_json(tmp_path, monkeypatch):
     state_file = tmp_path / "last-run.json"
     state_file.write_text("{invalid json")
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
     config = Config.load()
     assert _should_run("gcloud", config) is True
 
 
 def test_update_last_run_creates_state_file(tmp_path, monkeypatch):
-    state_dir = tmp_path / "maintenance"
+    state_dir = tmp_path / "mac-upkeep"
     state_file = state_dir / "last-run.json"
-    monkeypatch.setattr("maintenance.tasks._STATE_DIR", state_dir)
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_DIR", state_dir)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
     _update_last_run("gcloud")
     assert state_file.is_file()
     state = json.loads(state_file.read_text())
@@ -234,7 +234,7 @@ def test_run_frequency_skip(tmp_path, monkeypatch):
     state_file = tmp_path / "last-run.json"
     recent = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
     state_file.write_text(json.dumps({"gcloud": recent}))
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
     config = Config.load()
     output = Output(interactive=False)
     result = _run(
@@ -249,15 +249,15 @@ def test_run_frequency_skip(tmp_path, monkeypatch):
     assert result.reason == "ran recently"
 
 
-@patch("maintenance.tasks.subprocess.run")
-@patch("maintenance.tasks.shutil.which", return_value="/usr/bin/gcloud")
+@patch("mac_upkeep.tasks.subprocess.run")
+@patch("mac_upkeep.tasks.shutil.which", return_value="/usr/bin/gcloud")
 def test_force_bypasses_frequency(mock_which, mock_run, tmp_path, monkeypatch):
     """_run() executes forced task (filter passes, frequency bypassed)."""
     state_file = tmp_path / "last-run.json"
     recent = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
     state_file.write_text(json.dumps({"gcloud": recent}))
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
-    monkeypatch.setattr("maintenance.tasks._STATE_DIR", tmp_path)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_DIR", tmp_path)
     mock_run.return_value = MagicMock(returncode=0, stdout="", stderr="")
     config = Config.load()
     output = Output(interactive=False)
@@ -292,13 +292,13 @@ def test_force_filters_unselected_tasks():
 
 def test_dry_run_no_timestamp_update(tmp_path, monkeypatch):
     """Dry-run does not update the last-run timestamp."""
-    state_dir = tmp_path / "maintenance"
+    state_dir = tmp_path / "mac-upkeep"
     state_file = state_dir / "last-run.json"
-    monkeypatch.setattr("maintenance.tasks._STATE_DIR", state_dir)
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_DIR", state_dir)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
     config = Config.load()
     output = Output(interactive=False)
-    with patch("maintenance.tasks.shutil.which", return_value="/usr/bin/gcloud"):
+    with patch("mac_upkeep.tasks.shutil.which", return_value="/usr/bin/gcloud"):
         result = _run(
             "gcloud",
             ["gcloud", "update"],
@@ -344,14 +344,14 @@ def test_run_all_tasks_require_file_filter_before_file_check():
     assert results[0].reason == "not selected"
 
 
-@patch("maintenance.tasks.subprocess.run")
-@patch("maintenance.tasks.shutil.which", return_value="/usr/bin/echo")
+@patch("mac_upkeep.tasks.subprocess.run")
+@patch("mac_upkeep.tasks.shutil.which", return_value="/usr/bin/echo")
 def test_failed_task_no_timestamp_update(mock_which, mock_run, tmp_path, monkeypatch):
     """Failed task does not update the last-run timestamp."""
-    state_dir = tmp_path / "maintenance"
+    state_dir = tmp_path / "mac-upkeep"
     state_file = state_dir / "last-run.json"
-    monkeypatch.setattr("maintenance.tasks._STATE_DIR", state_dir)
-    monkeypatch.setattr("maintenance.tasks._STATE_FILE", state_file)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_DIR", state_dir)
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
     mock_run.return_value = MagicMock(returncode=1, stdout="", stderr="error")
     config = Config.load()
     output = Output(interactive=False)

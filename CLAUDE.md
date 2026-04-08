@@ -9,10 +9,10 @@
 | `uv run ruff format src/ tests/` | Format |
 | `uv run pytest` | Run tests |
 | `uv run pytest --cov` | Run tests with coverage |
-| `uv run maintenance run --dry-run` | Test CLI without side effects |
-| `uv run maintenance init` | Generate starter config (auto-detect tools) |
-| `uv run maintenance show-config --default` | Show all available task options |
-| `uv run maintenance notify-test` | Verify macOS notification permissions |
+| `uv run mac-upkeep run --dry-run` | Test CLI without side effects |
+| `uv run mac-upkeep init` | Generate starter config (auto-detect tools) |
+| `uv run mac-upkeep show-config --default` | Show all available task options |
+| `uv run mac-upkeep notify-test` | Verify macOS notification permissions |
 
 ## Architecture
 
@@ -27,15 +27,15 @@ output.py     → TaskResult dataclass, Rich Live table TUI (interactive), Pytho
 notify.py     → macOS notifications via terminal-notifier (preferred) / osascript (fallback)
 ```
 
-Entry point: `maintenance.cli:app` (registered in pyproject.toml `[project.scripts]`).
+Entry point: `mac_upkeep.cli:app` (registered in pyproject.toml `[project.scripts]`).
 
-Task execution order defined in `defaults.toml` `[run] order`. Users override in `~/.config/maintenance/config.toml`.
+Task execution order defined in `defaults.toml` `[run] order`. Users override in `~/.config/mac-upkeep/config.toml`.
 
 ## Key Patterns
 
 ### TOML-driven task registry
 
-- **`defaults.toml` is the single source of truth.** Adding a built-in task = 1 TOML entry. No Python code changes needed. The file is bundled via `importlib.resources.files("maintenance")` and loaded at startup.
+- **`defaults.toml` is the single source of truth.** Adding a built-in task = 1 TOML entry. No Python code changes needed. The file is bundled via `importlib.resources.files("mac_upkeep")` and loaded at startup.
 - **`TaskDef` fields are minimal.** `defaults.toml` only specifies fields that differ from `TaskDef` dataclass defaults (`frequency="weekly"`, `enabled=True`, `sudo=False`, `shell=""`, `require_file=""`, `timeout=300`). Weekly tasks omit `frequency`.
 - **Config.load() reads user TOML once.** Parsed data is passed to `load_task_defs()` as a dict — avoids double file read. Brewfile and notification settings are extracted from the same parse.
 
@@ -55,8 +55,8 @@ Do not add conditions to the filter or remove the `force_tasks is None` guard fr
 
 ### Frequency scheduling
 
-- Thresholds are 6 days for weekly and 27 days for monthly (not 7/30 — buffer for launchd schedule drift after sleep/reboot). State tracked in `~/.local/state/maintenance/last-run.json`.
-- **Safety net**: prevents redundant runs from launchd coalescing, manual `maintenance run`, or formula regressions re-enabling RunAtLoad. Do not remove even with `run_at_load false`. Homebrew defaults `run_at_load` to `true` ([service.rb:55](https://github.com/Homebrew/brew/blob/main/Library/Homebrew/service.rb)) — undocumented in Formula Cookbook.
+- Thresholds are 6 days for weekly and 27 days for monthly (not 7/30 — buffer for launchd schedule drift after sleep/reboot). State tracked in `~/.local/state/mac-upkeep/last-run.json`.
+- **Safety net**: prevents redundant runs from launchd coalescing, manual `mac-upkeep run`, or formula regressions re-enabling RunAtLoad. Do not remove even with `run_at_load false`. Homebrew defaults `run_at_load` to `true` ([service.rb:55](https://github.com/Homebrew/brew/blob/main/Library/Homebrew/service.rb)) — undocumented in Formula Cookbook.
 - Timestamps only update on successful non-dry-run execution. Corrupt/missing state file silently triggers re-run.
 
 ### Output and notifications
@@ -70,7 +70,7 @@ Do not add conditions to the filter or remove the `force_tasks is None` guard fr
 
 ### sudo + HOME
 
-`sudo -n` with full path `$BREW_PREFIX/bin/mo`. Sudoers `env_keep += "HOME"` preserves user's home directory (otherwise `HOME=/var/root` and mole misses user caches). The `sudo` field in `TaskDef` exists instead of embedding `sudo` in the command so that: (a) dry-run can skip sudo, (b) `detect` infers the correct binary, (c) `maintenance setup` can generate sudoers rules.
+`sudo -n` with full path `$BREW_PREFIX/bin/mo`. Sudoers `env_keep += "HOME"` preserves user's home directory (otherwise `HOME=/var/root` and mole misses user caches). The `sudo` field in `TaskDef` exists instead of embedding `sudo` in the command so that: (a) dry-run can skip sudo, (b) `detect` infers the correct binary, (c) `mac-upkeep setup` can generate sudoers rules.
 
 ### Brew prefix detection
 
@@ -85,10 +85,10 @@ Do not add conditions to the filter or remove the `force_tasks is None` guard fr
 - NOPASSWD in sudoers bypasses PAM entirely — no interaction with Touch ID (pam_tid) setup.
 - **launchd PATH requires `std_service_path_env`**: launchd default PATH is `/usr/bin:/bin:/usr/sbin:/sbin`. Without `environment_variables PATH: std_service_path_env` in the formula service block, all Homebrew-installed tools fail `shutil.which()`. Notifications fall back to osascript.
 - **No Python FileHandler for log file**: launchd redirects stderr to the log file. Python `FileHandler` causes duplicate lines. Log rotation handled by macOS newsyslog.d.
-- **newsyslog.d config** printed by `maintenance setup` but NOT auto-installed (requires `sudo tee`).
+- **newsyslog.d config** printed by `mac-upkeep setup` but NOT auto-installed (requires `sudo tee`).
 - **`terminal-notifier` is optional** — installed via `brew install terminal-notifier`.
 - **Do not open terminal windows from launchd** — fragile (focus stealing, macOS 13+ permission escalation). Use headless + notification + click-to-act.
-- **Testing**: `Config.load()` calls `get_brew_prefix()` which runs `subprocess.run(["brew", "--prefix"])`. Tests that mock `subprocess.run` or `shutil.which` will capture this call too (shared module objects). Mock `maintenance.config.get_brew_prefix` directly in `init` command tests.
+- **Testing**: `Config.load()` calls `get_brew_prefix()` which runs `subprocess.run(["brew", "--prefix"])`. Tests that mock `subprocess.run` or `shutil.which` will capture this call too (shared module objects). Mock `mac_upkeep.config.get_brew_prefix` directly in `init` command tests.
 
 ## Release Process
 

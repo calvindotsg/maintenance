@@ -42,7 +42,7 @@ wheels = [
 ]
 
 [[package]]
-name = "maintenance"
+name = "mac-upkeep"
 version = "1.2.1"
 source = { editable = "." }
 dependencies = [

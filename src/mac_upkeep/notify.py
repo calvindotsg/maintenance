@@ -8,9 +8,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from maintenance.output import TaskResult
+from mac_upkeep.output import TaskResult
 
-logger = logging.getLogger("maintenance")
+logger = logging.getLogger("mac_upkeep")
 
 
 def notify(
@@ -24,7 +24,7 @@ def notify(
 ) -> bool:
     """Send a macOS notification. Uses terminal-notifier if available, osascript fallback."""
     if shutil.which("terminal-notifier"):
-        cmd = ["terminal-notifier", "-title", title, "-message", message, "-group", "maintenance"]
+        cmd = ["terminal-notifier", "-title", title, "-message", message, "-group", "mac-upkeep"]
         if subtitle:
             cmd += ["-subtitle", subtitle]
         if sound:
@@ -85,7 +85,7 @@ def format_summary(results: list[TaskResult]) -> tuple[str, str, str]:
     failed = [r for r in results if r.status == "failed"]
 
     if failed:
-        title = f"Maintenance: {len(failed)} failed"
+        title = f"mac-upkeep: {len(failed)} failed"
         parts = []
         if ok:
             parts.append(f"{len(ok)} ran")
@@ -94,7 +94,7 @@ def format_summary(results: list[TaskResult]) -> tuple[str, str, str]:
         message = ", ".join(parts) if parts else "No tasks ran"
         subtitle = ", ".join(r.name for r in failed)
     else:
-        title = "Maintenance complete"
+        title = "mac-upkeep complete"
         parts = []
         if ok:
             parts.append(f"{len(ok)} ran")

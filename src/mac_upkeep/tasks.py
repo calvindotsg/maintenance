@@ -14,13 +14,13 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from maintenance.config import Config, TaskDef, load_default_task_names
-from maintenance.output import TaskResult
+from mac_upkeep.config import Config, TaskDef, load_default_task_names
+from mac_upkeep.output import TaskResult
 
 if TYPE_CHECKING:
-    from maintenance.output import Output
+    from mac_upkeep.output import Output
 
-logger = logging.getLogger("maintenance")
+logger = logging.getLogger("mac_upkeep")
 
 # Load task names from bundled defaults.toml at import time (for shell completion)
 TASKS, _DEFAULT_ORDER = load_default_task_names()
@@ -30,7 +30,7 @@ ANSI_PATTERN = re.compile(r"\x1b\[[0-9;]*m")
 
 # State file for per-task frequency tracking
 _xdg_state = os.environ.get("XDG_STATE_HOME", str(Path.home() / ".local" / "state"))
-_STATE_DIR = Path(_xdg_state) / "maintenance"
+_STATE_DIR = Path(_xdg_state) / "mac-upkeep"
 _STATE_FILE = _STATE_DIR / "last-run.json"
 FREQUENCY_THRESHOLDS = {"weekly": 6, "monthly": 27}  # days (buffer for schedule drift)
 
@@ -101,7 +101,7 @@ def run_task(
     detect: str = "",
     timeout: int = 300,
 ) -> TaskResult:
-    """Execute a maintenance task with auto-detection and graceful failure.
+    """Execute a mac-upkeep task with auto-detection and graceful failure.
 
     All logging/display is delegated to Output. run_task is a pure executor.
     """
@@ -208,7 +208,7 @@ def run_all_tasks(
     dry_run: bool = False,
     force_tasks: set[str] | None = None,
 ) -> list[TaskResult]:
-    """Run all maintenance tasks in order. Returns list of task results."""
+    """Run all mac-upkeep tasks in order. Returns list of task results."""
     results: list[TaskResult] = []
 
     for task_name in config.run_order:

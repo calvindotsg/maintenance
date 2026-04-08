@@ -1,4 +1,4 @@
-"""Maintenance CLI — automated macOS maintenance."""
+"""mac-upkeep CLI — automated macOS maintenance."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from typing import Annotated
 
 import typer
 
-from maintenance.config import (
+from mac_upkeep.config import (
     DEFAULT_CONFIG_DIR,
     DEFAULT_CONFIG_PATH,
     Config,
@@ -25,17 +25,17 @@ from maintenance.config import (
     get_brew_prefix,
     resolve_variables,
 )
-from maintenance.notify import detect_terminal_bundle_id, format_summary, notify
-from maintenance.output import Output
-from maintenance.tasks import TASKS, _load_state, run_all_tasks
+from mac_upkeep.notify import detect_terminal_bundle_id, format_summary, notify
+from mac_upkeep.output import Output
+from mac_upkeep.tasks import TASKS, _load_state, run_all_tasks
 
 app = typer.Typer(
-    help="Automated macOS maintenance CLI.\n\n"
+    help="Automated macOS mac-upkeep CLI.\n\n"
     "Runs 11 tasks: brew update/upgrade, gcloud, pnpm, uv, fisher, "
     "mo clean/optimize/purge, brew cleanup, brew bundle cleanup.\n\n"
-    "Install: brew install calvindotsg/tap/maintenance\n\n"
-    "Schedule: brew services start maintenance (Monday 12 PM weekly)\n\n"
-    "Config: ~/.config/maintenance/config.toml",
+    "Install: brew install calvindotsg/tap/mac-upkeep\n\n"
+    "Schedule: brew services start mac-upkeep (Monday 12 PM weekly)\n\n"
+    "Config: ~/.config/mac-upkeep/config.toml",
     no_args_is_help=True,
 )
 
@@ -64,14 +64,14 @@ def _complete_force(ctx: typer.Context, incomplete: str) -> list[tuple[str, str]
 def _setup_logging(debug: bool = False) -> None:
     level = logging.DEBUG if debug else logging.INFO
     logging.basicConfig(
-        format="[maintenance] %(asctime)s %(message)s",
+        format="[mac-upkeep] %(asctime)s %(message)s",
         datefmt="%Y-%m-%d %H:%M:%S",
         level=level,
     )
 
 
 def _handle_signal(signum: int, _frame: object) -> None:
-    logging.getLogger("maintenance").warning("Interrupted (signal %d)", signum)
+    logging.getLogger("mac_upkeep").warning("Interrupted (signal %d)", signum)
     sys.exit(130)
 
 
@@ -82,10 +82,10 @@ signal.signal(signal.SIGTERM, _handle_signal)
 def _version_callback(value: bool) -> None:
     if value:
         try:
-            v = pkg_version("maintenance")
+            v = pkg_version("mac-upkeep")
         except Exception:
             v = "unknown"
-        typer.echo(f"maintenance {v}")
+        typer.echo(f"mac-upkeep {v}")
         raise typer.Exit()
 
 
@@ -98,7 +98,7 @@ def main(
         ),
     ] = None,
 ) -> None:
-    """Automated macOS maintenance CLI."""
+    """Automated macOS mac-upkeep CLI."""
 
 
 @app.command()
@@ -117,10 +117,10 @@ def run(
         ),
     ] = None,
 ) -> None:
-    """Run all maintenance tasks.
+    """Run all mac-upkeep tasks.
 
     Tasks are auto-detected: missing tools are skipped with a log message.
-    Disable specific tasks via config file or MAINTENANCE_<TASK>=false environment variables.
+    Disable specific tasks via config file or MAC_UPKEEP_<TASK>=false environment variables.
 
     Task order: brew_update, brew_upgrade, gcloud, pnpm, uv, fisher,
     mo_clean, mo_optimize, mo_purge, brew_cleanup, brew_bundle.
@@ -154,7 +154,7 @@ def run(
     if config.notify and not dry_run:
         title, message, subtitle = format_summary(results)
         brew_prefix = get_brew_prefix()
-        log_url = f"file://{brew_prefix}/var/log/maintenance.log"
+        log_url = f"file://{brew_prefix}/var/log/mac-upkeep.log"
         bundle_id = detect_terminal_bundle_id()
         notify(
             title,
@@ -207,7 +207,7 @@ def init(
     """Generate a starter config based on detected tools.
 
     Probes your system to discover installed tools and writes a commented
-    config to ~/.config/maintenance/config.toml. Only detected tasks are
+    config to ~/.config/mac-upkeep/config.toml. Only detected tasks are
     listed. Built-in defaults apply automatically — uncomment to override.
     """
     config_path = DEFAULT_CONFIG_PATH
@@ -247,7 +247,7 @@ def init(
     config_path.write_text(config_text)
     typer.echo(f"Created {config_path}")
     typer.echo(f"  {len(detected)} tasks detected, {len(not_detected)} not found")
-    typer.echo("  Edit the file to customize. Run 'maintenance tasks' to see status.")
+    typer.echo("  Edit the file to customize. Run 'mac-upkeep tasks' to see status.")
 
 
 def _generate_init_config(
@@ -260,14 +260,14 @@ def _generate_init_config(
     lines: list[str] = []
     total = len(detected) + len(not_detected)
 
-    lines.append("# maintenance configuration")
+    lines.append("# mac-upkeep configuration")
     lines.append(
         f"# Generated {date.today()} — {len(detected)} of {total} tasks detected on this system."
     )
     lines.append("#")
     lines.append("# Built-in defaults apply automatically. Only uncomment lines to change.")
-    lines.append("# Run 'maintenance tasks' to see task status and last run times.")
-    lines.append("# Run 'maintenance show-config --default' to see all defaults.")
+    lines.append("# Run 'mac-upkeep tasks' to see task status and last run times.")
+    lines.append("# Run 'mac-upkeep show-config --default' to see all defaults.")
     lines.append("")
 
     if detected:
@@ -321,7 +321,7 @@ def show_config(
     """
     if default:
         text = (
-            importlib.resources.files("maintenance")
+            importlib.resources.files("mac_upkeep")
             .joinpath("defaults.toml")
             .read_text(encoding="utf-8")
         )
@@ -332,8 +332,8 @@ def show_config(
         else:
             typer.echo(f"No config file found at {DEFAULT_CONFIG_PATH}")
             typer.echo(
-                "Run 'maintenance init' to generate one, or "
-                "'maintenance show-config --default' to see all defaults."
+                "Run 'mac-upkeep init' to generate one, or "
+                "'mac-upkeep show-config --default' to see all defaults."
             )
 
 
@@ -347,9 +347,9 @@ def notify_test() -> None:
     config = Config.load()
     brew_prefix = get_brew_prefix()
     bundle_id = detect_terminal_bundle_id()
-    log_url = f"file://{brew_prefix}/var/log/maintenance.log"
+    log_url = f"file://{brew_prefix}/var/log/mac-upkeep.log"
     ok = notify(
-        "Maintenance",
+        "mac-upkeep",
         "Test notification",
         sound=config.notify_sound,
         activate_bundle_id=bundle_id,
@@ -369,8 +369,8 @@ def setup() -> None:
     Generates machine-specific rules using your username and Homebrew prefix.
     Pipe to sudoers::
 
-        maintenance setup | sudo tee /etc/sudoers.d/maintenance
-        sudo chmod 0440 /etc/sudoers.d/maintenance
+        mac-upkeep setup | sudo tee /etc/sudoers.d/mac-upkeep
+        sudo chmod 0440 /etc/sudoers.d/mac-upkeep
 
     The env_keep line preserves HOME so mole operates on your home directory,
     not /var/root (which is the default when running via sudo).
@@ -379,10 +379,10 @@ def setup() -> None:
     brew_prefix = get_brew_prefix()
     mo_bin = f"{brew_prefix}/bin/mo"
 
-    typer.echo(f"# Sudoers rules for maintenance CLI ({user}@{brew_prefix})")
+    typer.echo(f"# Sudoers rules for mac-upkeep CLI ({user}@{brew_prefix})")
     typer.echo(
-        "# Install: maintenance setup | sudo tee /etc/sudoers.d/maintenance"
-        " && sudo chmod 0440 /etc/sudoers.d/maintenance"
+        "# Install: mac-upkeep setup | sudo tee /etc/sudoers.d/mac-upkeep"
+        " && sudo chmod 0440 /etc/sudoers.d/mac-upkeep"
     )
     typer.echo()
     typer.echo(f'Defaults!{mo_bin} env_keep += "HOME"')
@@ -390,17 +390,17 @@ def setup() -> None:
     typer.echo(f"{user} ALL = (root) NOPASSWD: {mo_bin} optimize")
     typer.echo()
     typer.echo("# Log rotation (install separately):")
-    log_path = f"{brew_prefix}/var/log/maintenance.log"
+    log_path = f"{brew_prefix}/var/log/mac-upkeep.log"
     typer.echo(f"# echo '{log_path}  {user}:admin  644  12  *  $M1D0  GN'")
-    typer.echo("#   | sudo tee /etc/newsyslog.d/maintenance.conf")
+    typer.echo("#   | sudo tee /etc/newsyslog.d/mac-upkeep.conf")
 
 
 @app.command()
 def status() -> None:
-    """Show brew service status for maintenance."""
+    """Show brew service status for mac-upkeep."""
     try:
         result = subprocess.run(
-            ["brew", "services", "info", "maintenance"],
+            ["brew", "services", "info", "mac-upkeep"],
             capture_output=True,
             text=True,
         )
@@ -415,12 +415,12 @@ def logs(
     follow: Annotated[bool, typer.Option("-f", "--follow", help="Follow log output.")] = False,
     lines: Annotated[int, typer.Argument(help="Number of lines to show.")] = 20,
 ) -> None:
-    """View maintenance log output.
+    """View mac-upkeep log output.
 
-    Logs are written by brew services to $(brew --prefix)/var/log/maintenance.log.
+    Logs are written by brew services to $(brew --prefix)/var/log/mac-upkeep.log.
     """
     brew_prefix = get_brew_prefix()
-    log_file = Path(brew_prefix) / "var" / "log" / "maintenance.log"
+    log_file = Path(brew_prefix) / "var" / "log" / "mac_upkeep.log"
 
     if not log_file.is_file():
         typer.echo(f"No log file found at {log_file}")

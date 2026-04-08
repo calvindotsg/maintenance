@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
-from maintenance.output import Output, TaskResult
+from mac_upkeep.output import Output, TaskResult
 
 
 def test_task_result_defaults():
@@ -35,16 +35,16 @@ def test_output_non_interactive_header(caplog):
     import logging
 
     output = _non_interactive()
-    with caplog.at_level(logging.INFO, logger="maintenance"):
+    with caplog.at_level(logging.INFO, logger="mac_upkeep"):
         output.header(dry_run=False)
-    assert "Starting maintenance..." in caplog.text
+    assert "Starting mac-upkeep..." in caplog.text
 
 
 def test_output_non_interactive_header_dry_run(caplog):
     import logging
 
     output = _non_interactive()
-    with caplog.at_level(logging.INFO, logger="maintenance"):
+    with caplog.at_level(logging.INFO, logger="mac_upkeep"):
         output.header(dry_run=True)
     assert "dry-run" in caplog.text
 
@@ -54,7 +54,7 @@ def test_output_non_interactive_task_done_ok(caplog):
 
     output = _non_interactive()
     result = TaskResult("gcloud", "ok", duration=2.5)
-    with caplog.at_level(logging.INFO, logger="maintenance"):
+    with caplog.at_level(logging.INFO, logger="mac_upkeep"):
         output.task_done(result)
     assert "Running gcloud... done" in caplog.text
 
@@ -64,7 +64,7 @@ def test_output_non_interactive_task_done_dry_run(caplog):
 
     output = _non_interactive()
     result = TaskResult("gcloud", "ok", reason="dry-run")
-    with caplog.at_level(logging.INFO, logger="maintenance"):
+    with caplog.at_level(logging.INFO, logger="mac_upkeep"):
         output.task_done(result)
     assert "DRY-RUN" in caplog.text
 
@@ -74,7 +74,7 @@ def test_output_non_interactive_task_done_skipped(caplog):
 
     output = _non_interactive()
     result = TaskResult("uv", "skipped", reason="not installed")
-    with caplog.at_level(logging.INFO, logger="maintenance"):
+    with caplog.at_level(logging.INFO, logger="mac_upkeep"):
         output.task_done(result)
     assert "SKIP" in caplog.text
     assert "not installed" in caplog.text
@@ -85,7 +85,7 @@ def test_output_non_interactive_task_done_failed(caplog):
 
     output = _non_interactive()
     result = TaskResult("mo_clean", "failed", reason="exit code 1")
-    with caplog.at_level(logging.WARNING, logger="maintenance"):
+    with caplog.at_level(logging.WARNING, logger="mac_upkeep"):
         output.task_done(result)
     assert "mo_clean" in caplog.text
 
@@ -99,7 +99,7 @@ def test_output_non_interactive_summary_no_failures(caplog):
         TaskResult("gcloud", "ok"),
         TaskResult("uv", "skipped", reason="not installed"),
     ]
-    with caplog.at_level(logging.INFO, logger="maintenance"):
+    with caplog.at_level(logging.INFO, logger="mac_upkeep"):
         output.summary(results)
     assert "1 ran, 1 skipped" in caplog.text
     assert "failed" not in caplog.text
@@ -115,7 +115,7 @@ def test_output_non_interactive_summary_with_failures(caplog):
         TaskResult("mo_clean", "failed", reason="exit code 1"),
         TaskResult("uv", "skipped", reason="not installed"),
     ]
-    with caplog.at_level(logging.INFO, logger="maintenance"):
+    with caplog.at_level(logging.INFO, logger="mac_upkeep"):
         output.summary(results)
     assert "1 ran, 1 skipped, 1 failed" in caplog.text
 
