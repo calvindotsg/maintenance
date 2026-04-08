@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 _xdg = os.environ.get("XDG_CONFIG_HOME", str(Path.home() / ".config"))
-DEFAULT_CONFIG_DIR = Path(_xdg) / "maintenance"
+DEFAULT_CONFIG_DIR = Path(_xdg) / "mac-upkeep"
 DEFAULT_CONFIG_PATH = DEFAULT_CONFIG_DIR / "config.toml"
 
 
@@ -67,7 +67,7 @@ def _build_variables(brewfile: str) -> dict[str, str]:
 def _load_defaults() -> dict:
     """Load bundled defaults.toml via importlib.resources."""
     text = (
-        importlib.resources.files("maintenance")
+        importlib.resources.files("mac_upkeep")
         .joinpath("defaults.toml")
         .read_text(encoding="utf-8")
     )
@@ -126,14 +126,14 @@ def load_task_defs(
         if "run" in user_data and "order" in user_data["run"]:
             run_order = user_data["run"]["order"]
 
-    # Env var overrides (MAINTENANCE_<TASK>=false, MAINTENANCE_<TASK>_FREQUENCY=monthly)
+    # Env var overrides (MAC_UPKEEP_<TASK>=false, MAC_UPKEEP_<TASK>_FREQUENCY=monthly)
     for task_name, td in task_defs.items():
-        env_key = f"MAINTENANCE_{task_name.upper()}"
+        env_key = f"MAC_UPKEEP_{task_name.upper()}"
         env_val = os.environ.get(env_key)
         if env_val is not None:
             td.enabled = env_val.lower() not in ("false", "0", "no")
 
-        freq_key = f"MAINTENANCE_{task_name.upper()}_FREQUENCY"
+        freq_key = f"MAC_UPKEEP_{task_name.upper()}_FREQUENCY"
         freq_val = os.environ.get(freq_key)
         if freq_val is not None:
             td.frequency = freq_val.lower()
@@ -167,7 +167,7 @@ def _parse_task_def(name: str, data: dict) -> TaskDef:
 
 @dataclass
 class Config:
-    """Maintenance configuration loaded from TOML + environment overrides."""
+    """mac-upkeep configuration loaded from TOML + environment overrides."""
 
     task_defs: dict[str, TaskDef] = field(default_factory=dict)
     run_order: list[str] = field(default_factory=list)
@@ -199,13 +199,13 @@ class Config:
             config.brewfile = user_data["paths"]["brewfile"]
 
         # Notification env override
-        env_notify = os.environ.get("MAINTENANCE_NOTIFY")
+        env_notify = os.environ.get("MAC_UPKEEP_NOTIFY")
         if env_notify is not None:
             config.notify = env_notify.lower() not in ("false", "0", "no")
 
         # Brewfile path: env var → config file → HOMEBREW_BUNDLE_FILE → auto-discover
-        if os.environ.get("MAINTENANCE_BREWFILE"):
-            config.brewfile = os.environ["MAINTENANCE_BREWFILE"]
+        if os.environ.get("MAC_UPKEEP_BREWFILE"):
+            config.brewfile = os.environ["MAC_UPKEEP_BREWFILE"]
         if not config.brewfile:
             config.brewfile = os.environ.get("HOMEBREW_BUNDLE_FILE")
         if not config.brewfile:

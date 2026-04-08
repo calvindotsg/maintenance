@@ -3,8 +3,8 @@
 ## Development Setup
 
 ```bash
-git clone https://github.com/calvindotsg/maintenance.git
-cd maintenance
+git clone https://github.com/calvindotsg/mac-upkeep.git
+cd mac-upkeep
 uv sync
 ```
 

@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 from typer.testing import CliRunner
 
-from maintenance.cli import app
+from mac_upkeep.cli import app
 
 runner = CliRunner()
 
@@ -14,7 +14,7 @@ runner = CliRunner()
 def test_help_exits_zero():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0
-    assert "maintenance" in result.output.lower()
+    assert "mac-upkeep" in result.output.lower()
 
 
 def test_version_flag():
@@ -52,14 +52,14 @@ def test_force_invalid_shows_valid_tasks():
 def test_notify_test_command_succeeds():
     from unittest.mock import patch
 
-    with patch("maintenance.cli.notify", return_value=True):
+    with patch("mac_upkeep.cli.notify", return_value=True):
         result = runner.invoke(app, ["notify-test"])
     assert result.exit_code == 0
     assert "Notification sent" in result.output
 
 
 def test_notify_test_command_fails():
-    with patch("maintenance.cli.notify", return_value=False):
+    with patch("mac_upkeep.cli.notify", return_value=False):
         result = runner.invoke(app, ["notify-test"])
     assert result.exit_code == 1
     assert "Notification failed" in result.output
@@ -71,10 +71,10 @@ def test_notify_test_command_fails():
 def test_init_creates_config(tmp_path):
     config_path = tmp_path / "config.toml"
     with (
-        patch("maintenance.cli.DEFAULT_CONFIG_DIR", tmp_path),
-        patch("maintenance.cli.DEFAULT_CONFIG_PATH", config_path),
-        patch("maintenance.cli.shutil.which", return_value="/opt/homebrew/bin/brew"),
-        patch("maintenance.config.get_brew_prefix", return_value="/opt/homebrew"),
+        patch("mac_upkeep.cli.DEFAULT_CONFIG_DIR", tmp_path),
+        patch("mac_upkeep.cli.DEFAULT_CONFIG_PATH", config_path),
+        patch("mac_upkeep.cli.shutil.which", return_value="/opt/homebrew/bin/brew"),
+        patch("mac_upkeep.config.get_brew_prefix", return_value="/opt/homebrew"),
     ):
         result = runner.invoke(app, ["init"])
     assert result.exit_code == 0, result.output
@@ -83,7 +83,7 @@ def test_init_creates_config(tmp_path):
     # All-comments — no active TOML lines
     active_lines = [ln for ln in content.splitlines() if ln.strip() and not ln.startswith("#")]
     assert active_lines == []
-    assert "maintenance configuration" in content
+    assert "mac-upkeep configuration" in content
     assert "Customize" in content
 
 
@@ -95,10 +95,10 @@ def test_init_shows_detected_tasks(tmp_path):
         return "/opt/homebrew/bin/brew" if "brew" in binary else None
 
     with (
-        patch("maintenance.cli.DEFAULT_CONFIG_DIR", tmp_path),
-        patch("maintenance.cli.DEFAULT_CONFIG_PATH", config_path),
-        patch("maintenance.cli.shutil.which", side_effect=which_side_effect),
-        patch("maintenance.config.get_brew_prefix", return_value="/opt/homebrew"),
+        patch("mac_upkeep.cli.DEFAULT_CONFIG_DIR", tmp_path),
+        patch("mac_upkeep.cli.DEFAULT_CONFIG_PATH", config_path),
+        patch("mac_upkeep.cli.shutil.which", side_effect=which_side_effect),
+        patch("mac_upkeep.config.get_brew_prefix", return_value="/opt/homebrew"),
     ):
         result = runner.invoke(app, ["init"])
     assert result.exit_code == 0, result.output
@@ -113,8 +113,8 @@ def test_init_errors_if_config_exists(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text("existing content")
     with (
-        patch("maintenance.cli.DEFAULT_CONFIG_DIR", tmp_path),
-        patch("maintenance.cli.DEFAULT_CONFIG_PATH", config_path),
+        patch("mac_upkeep.cli.DEFAULT_CONFIG_DIR", tmp_path),
+        patch("mac_upkeep.cli.DEFAULT_CONFIG_PATH", config_path),
     ):
         result = runner.invoke(app, ["init"])
     assert result.exit_code == 1
@@ -127,9 +127,9 @@ def test_init_force_overwrites(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text("old content")
     with (
-        patch("maintenance.cli.DEFAULT_CONFIG_DIR", tmp_path),
-        patch("maintenance.cli.DEFAULT_CONFIG_PATH", config_path),
-        patch("maintenance.cli.shutil.which", return_value=None),
+        patch("mac_upkeep.cli.DEFAULT_CONFIG_DIR", tmp_path),
+        patch("mac_upkeep.cli.DEFAULT_CONFIG_PATH", config_path),
+        patch("mac_upkeep.cli.shutil.which", return_value=None),
     ):
         result = runner.invoke(app, ["init", "--force"])
     assert result.exit_code == 0
@@ -150,17 +150,17 @@ def test_show_config_default_outputs_defaults_toml():
 
 def test_show_config_no_user_config(tmp_path):
     config_path = tmp_path / "config.toml"
-    with patch("maintenance.cli.DEFAULT_CONFIG_PATH", config_path):
+    with patch("mac_upkeep.cli.DEFAULT_CONFIG_PATH", config_path):
         result = runner.invoke(app, ["show-config"])
     assert result.exit_code == 0
     assert "No config file found" in result.output
-    assert "maintenance init" in result.output
+    assert "mac-upkeep init" in result.output
 
 
 def test_show_config_user_config(tmp_path):
     config_path = tmp_path / "config.toml"
     config_path.write_text("[tasks.gcloud]\nenabled = false\n")
-    with patch("maintenance.cli.DEFAULT_CONFIG_PATH", config_path):
+    with patch("mac_upkeep.cli.DEFAULT_CONFIG_PATH", config_path):
         result = runner.invoke(app, ["show-config"])
     assert result.exit_code == 0
     assert "[tasks.gcloud]" in result.output

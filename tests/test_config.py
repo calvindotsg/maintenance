@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
-from maintenance.config import (
+from mac_upkeep.config import (
     Config,
     TaskDef,
     _load_defaults,
@@ -153,7 +153,7 @@ def test_load_task_defs_user_run_order():
 
 
 def test_load_task_defs_env_override(monkeypatch):
-    monkeypatch.setenv("MAINTENANCE_GCLOUD", "false")
+    monkeypatch.setenv("MAC_UPKEEP_GCLOUD", "false")
     variables = {"BREW_PREFIX": "/opt/homebrew", "BREWFILE": "", "HOME": "/users/me"}
     task_defs, _ = load_task_defs(None, variables)
     assert task_defs["gcloud"].enabled is False
@@ -161,7 +161,7 @@ def test_load_task_defs_env_override(monkeypatch):
 
 
 def test_load_task_defs_env_frequency_override(monkeypatch):
-    monkeypatch.setenv("MAINTENANCE_GCLOUD_FREQUENCY", "weekly")
+    monkeypatch.setenv("MAC_UPKEEP_GCLOUD_FREQUENCY", "weekly")
     variables = {"BREW_PREFIX": "/opt/homebrew", "BREWFILE": "", "HOME": "/users/me"}
     task_defs, _ = load_task_defs(None, variables)
     assert task_defs["gcloud"].frequency == "weekly"
@@ -192,7 +192,7 @@ def test_config_get_frequency():
 
 
 def test_env_var_disables_task(monkeypatch):
-    monkeypatch.setenv("MAINTENANCE_GCLOUD", "false")
+    monkeypatch.setenv("MAC_UPKEEP_GCLOUD", "false")
     config = Config.load(Path("/nonexistent/config.toml"))
     assert not config.is_enabled("gcloud")
     assert config.is_enabled("pnpm")
@@ -202,7 +202,7 @@ def test_env_var_overrides_config(tmp_path):
     config_file = tmp_path / "config.toml"
     config_file.write_text("[tasks.gcloud]\nenabled = true\n")
 
-    with patch.dict("os.environ", {"MAINTENANCE_GCLOUD": "false"}):
+    with patch.dict("os.environ", {"MAC_UPKEEP_GCLOUD": "false"}):
         config = Config.load(config_file)
     assert not config.is_enabled("gcloud")
 
@@ -225,7 +225,7 @@ def test_toml_config_overrides_frequency(tmp_path):
 
 
 def test_brewfile_from_env(monkeypatch):
-    monkeypatch.setenv("MAINTENANCE_BREWFILE", "/custom/Brewfile")
+    monkeypatch.setenv("MAC_UPKEEP_BREWFILE", "/custom/Brewfile")
     config = Config.load(Path("/nonexistent/config.toml"))
     assert config.brewfile == "/custom/Brewfile"
 
@@ -253,7 +253,7 @@ def test_notify_from_toml(tmp_path):
 
 
 def test_notify_env_var_disables(monkeypatch):
-    monkeypatch.setenv("MAINTENANCE_NOTIFY", "false")
+    monkeypatch.setenv("MAC_UPKEEP_NOTIFY", "false")
     config = Config.load(Path("/nonexistent/config.toml"))
     assert config.notify is False
 
@@ -261,12 +261,12 @@ def test_notify_env_var_disables(monkeypatch):
 def test_notify_env_var_overrides_toml(tmp_path, monkeypatch):
     config_file = tmp_path / "config.toml"
     config_file.write_text("[notifications]\nenabled = true\n")
-    monkeypatch.setenv("MAINTENANCE_NOTIFY", "0")
+    monkeypatch.setenv("MAC_UPKEEP_NOTIFY", "0")
     config = Config.load(config_file)
     assert config.notify is False
 
 
 def test_frequency_env_override(monkeypatch):
-    monkeypatch.setenv("MAINTENANCE_GCLOUD_FREQUENCY", "weekly")
+    monkeypatch.setenv("MAC_UPKEEP_GCLOUD_FREQUENCY", "weekly")
     config = Config.load(Path("/nonexistent/config.toml"))
     assert config.get_frequency("gcloud") == "weekly"

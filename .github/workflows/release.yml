@@ -67,7 +67,7 @@ jobs:
           event-type: formula-update
           client-payload: |-
             {
-              "formula": "maintenance",
+              "formula": "mac-upkeep",
               "version": "${{ needs.release-please.outputs.tag_name }}",
               "url": "https://github.com/calvindotsg/maintenance/archive/refs/tags/${{ needs.release-please.outputs.tag_name }}.tar.gz",
               "type": "python"
