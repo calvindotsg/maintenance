@@ -11,6 +11,13 @@ from mac_upkeep.cli import app
 runner = CliRunner()
 
 
+def test_platform_guard_non_darwin(monkeypatch):
+    monkeypatch.setattr("sys.platform", "linux")
+    result = runner.invoke(app, ["run", "--dry-run"])
+    assert result.exit_code == 1
+    assert "requires macOS" in result.output
+
+
 def test_help_exits_zero():
     result = runner.invoke(app, ["--help"])
     assert result.exit_code == 0

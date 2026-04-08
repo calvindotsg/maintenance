@@ -99,6 +99,9 @@ def main(
     ] = None,
 ) -> None:
     """Automated macOS mac-upkeep CLI."""
+    if sys.platform != "darwin":
+        typer.echo("mac-upkeep requires macOS.", err=True)
+        raise typer.Exit(code=1)
 
 
 @app.command()
