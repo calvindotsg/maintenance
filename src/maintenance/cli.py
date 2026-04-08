@@ -14,10 +14,10 @@ from typing import Annotated
 
 import typer
 
-from maintenance.config import Config
+from maintenance.config import Config, get_brew_prefix
 from maintenance.notify import detect_terminal_bundle_id, format_summary, notify
 from maintenance.output import Output
-from maintenance.tasks import ALL_TASK_NAMES, TASKS, _load_state, get_brew_prefix, run_all_tasks
+from maintenance.tasks import TASKS, _load_state, run_all_tasks
 
 app = typer.Typer(
     help="Automated macOS maintenance CLI.\n\n"
@@ -32,11 +32,20 @@ app = typer.Typer(
 
 def _complete_force(ctx: typer.Context, incomplete: str) -> list[tuple[str, str]]:
     """Shell completion for --force task names."""
+    try:
+        config = Config.load()
+        task_names = {
+            name: config.task_defs[name].description
+            for name in config.run_order
+            if name in config.task_defs
+        }
+    except Exception:
+        task_names = TASKS  # fallback to import-time defaults
     already = set(ctx.params.get("force") or [])
     completions: list[tuple[str, str]] = []
     if "all".startswith(incomplete) and "all" not in already:
         completions.append(("all", "Force all tasks"))
-    for name, desc in TASKS.items():
+    for name, desc in task_names.items():
         if name.startswith(incomplete) and name not in already:
             completions.append((name, desc))
     return completions
@@ -117,18 +126,18 @@ def run(
     # Validate and convert --force option
     force_set: set[str] | None = None
     if force is not None:
-        valid_names = set(ALL_TASK_NAMES)
+        valid_names = set(config.run_order)
         if "all" in force:
             force_set = valid_names
         else:
             invalid = [t for t in force if t not in valid_names]
             if invalid:
                 typer.echo(f"Unknown task(s): {', '.join(invalid)}", err=True)
-                typer.echo(f"Valid tasks: {', '.join(ALL_TASK_NAMES)}", err=True)
+                typer.echo(f"Valid tasks: {', '.join(config.run_order)}", err=True)
                 raise typer.Exit(1)
             force_set = set(force)
 
-    output.header(dry_run=dry_run, task_names=ALL_TASK_NAMES)
+    output.header(dry_run=dry_run, task_names=config.run_order)
     results = run_all_tasks(config=config, output=output, dry_run=dry_run, force_tasks=force_set)
     output.summary(results)
 
@@ -153,6 +162,10 @@ def tasks() -> None:
     config = Config.load()
     state = _load_state()
 
+    task_list = [
+        (name, config.task_defs[name]) for name in config.run_order if name in config.task_defs
+    ]
+
     if sys.stdout.isatty():
         from rich.console import Console
         from rich.table import Table
@@ -164,19 +177,17 @@ def tasks() -> None:
         table.add_column("Enabled", min_width=7)
         table.add_column("Last Run", min_width=10)
 
-        for name, desc in TASKS.items():
-            freq = config.get_frequency(name)
-            enabled = "[green]yes[/green]" if config.is_enabled(name) else "[dim]no[/dim]"
+        for name, td in task_list:
+            enabled = "[green]yes[/green]" if td.enabled else "[dim]no[/dim]"
             last_run = state.get(name, "never")
-            table.add_row(name, desc, freq, enabled, last_run)
+            table.add_row(name, td.description, td.frequency, enabled, last_run)
 
         Console(highlight=False).print(table)
     else:
-        for name, desc in TASKS.items():
-            freq = config.get_frequency(name)
-            enabled = "yes" if config.is_enabled(name) else "no"
+        for name, td in task_list:
+            enabled = "yes" if td.enabled else "no"
             last_run = state.get(name, "never")
-            typer.echo(f"{name}\t{desc}\t{freq}\t{enabled}\t{last_run}")
+            typer.echo(f"{name}\t{td.description}\t{td.frequency}\t{enabled}\t{last_run}")
 
 
 @app.command(name="notify-test")
