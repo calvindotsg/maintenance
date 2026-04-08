@@ -9,7 +9,15 @@ from unittest.mock import MagicMock, patch
 
 from maintenance.config import Config, TaskDef
 from maintenance.output import Output
-from maintenance.tasks import _build_cmd, _run, _should_run, _update_last_run, run_task, strip_ansi
+from maintenance.tasks import (
+    _build_cmd,
+    _run,
+    _should_run,
+    _update_last_run,
+    run_all_tasks,
+    run_task,
+    strip_ansi,
+)
 
 
 def test_strip_ansi_removes_color_codes():
@@ -302,6 +310,38 @@ def test_dry_run_no_timestamp_update(tmp_path, monkeypatch):
     assert result.status == "ok"
     assert result.reason == "dry-run"
     assert not state_file.exists()
+
+
+# --- run_all_tasks require_file tests ---
+
+
+def test_run_all_tasks_require_file_skips_missing(tmp_path):
+    """run_all_tasks skips tasks with require_file pointing to nonexistent file."""
+    config = Config.load()
+    # brew_bundle has require_file="${BREWFILE}" which resolves to a real path
+    # Override it to point to a nonexistent file
+    config.task_defs["brew_bundle"].require_file = str(tmp_path / "nonexistent")
+    # Only run brew_bundle to isolate the test
+    config.run_order = ["brew_bundle"]
+    output = Output(interactive=False)
+    results = run_all_tasks(
+        config=config, output=output, dry_run=False, force_tasks={"brew_bundle"}
+    )
+    assert len(results) == 1
+    assert results[0].status == "skipped"
+    assert "file not found" in results[0].reason
+
+
+def test_run_all_tasks_require_file_filter_before_file_check():
+    """require_file tasks show 'not selected' when filtered, not 'file not found'."""
+    config = Config.load()
+    config.task_defs["brew_bundle"].require_file = "/nonexistent"
+    config.run_order = ["brew_bundle"]
+    output = Output(interactive=False)
+    # force_tasks does NOT include brew_bundle → filter wins
+    results = run_all_tasks(config=config, output=output, dry_run=False, force_tasks={"gcloud"})
+    assert len(results) == 1
+    assert results[0].reason == "not selected"
 
 
 @patch("maintenance.tasks.subprocess.run")
