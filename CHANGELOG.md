@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.1.2](https://github.com/calvindotsg/mac-upkeep/compare/v2.1.1...v2.1.2) (2026-04-09)
+
+
+### Documentation
+
+* use absolute URL for demo GIF, move to demo/ ([#23](https://github.com/calvindotsg/mac-upkeep/issues/23)) ([4b995cc](https://github.com/calvindotsg/mac-upkeep/commit/4b995cca20df73d39604bd1bcadf666ca4eeb213))
+
 ## [2.1.1](https://github.com/calvindotsg/mac-upkeep/compare/v2.1.0...v2.1.1) (2026-04-08)
 
 
