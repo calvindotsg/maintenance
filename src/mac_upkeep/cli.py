@@ -34,7 +34,7 @@ app = typer.Typer(
     "Runs 11 tasks: brew update/upgrade, gcloud, pnpm, uv, fisher, "
     "mo clean/optimize/purge, brew cleanup, brew bundle cleanup.\n\n"
     "Install: brew install calvindotsg/tap/mac-upkeep\n\n"
-    "Schedule: brew services start mac-upkeep (Monday 12 PM weekly)\n\n"
+    "Schedule: brew services start mac-upkeep (on boot + Monday 12 PM)\n\n"
     "Config: ~/.config/mac-upkeep/config.toml",
     no_args_is_help=True,
 )

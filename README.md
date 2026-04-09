@@ -14,7 +14,7 @@ Automated macOS maintenance CLI. Runs Homebrew updates, dev tool cache cleanup (
 
 ```bash
 brew install calvindotsg/tap/mac-upkeep
-brew services start mac-upkeep  # Monday 12 PM weekly
+brew services start mac-upkeep  # runs on boot + Monday 12 PM
 ```
 
 Or via [uv](https://docs.astral.sh/uv/):
