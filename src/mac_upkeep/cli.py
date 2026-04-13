@@ -27,7 +27,7 @@ from mac_upkeep.config import (
 )
 from mac_upkeep.notify import detect_terminal_bundle_id, format_summary, notify
 from mac_upkeep.output import Output
-from mac_upkeep.tasks import TASKS, _load_state, run_all_tasks
+from mac_upkeep.tasks import TASKS, _load_state, format_last_run, format_next_run, run_all_tasks
 
 app = typer.Typer(
     help="Automated macOS mac-upkeep CLI.\n\n"
@@ -188,20 +188,35 @@ def tasks() -> None:
         table.add_column("Task", min_width=14)
         table.add_column("Description", min_width=20)
         table.add_column("Frequency", min_width=8)
-        table.add_column("Enabled", min_width=7)
+        table.add_column("Status", min_width=8)
         table.add_column("Last Run", min_width=10)
+        table.add_column("Next Run", min_width=10)
 
         for name, td in task_list:
-            enabled = "[green]yes[/green]" if td.enabled else "[dim]no[/dim]"
-            last_run = state.get(name, "never")
-            table.add_row(name, td.description, td.frequency, enabled, last_run)
+            if not td.enabled:
+                status = "[dim]disabled[/dim]"
+            elif shutil.which(td.detect) is None:
+                status = "[yellow]not found[/yellow]"
+            else:
+                status = "[green]ready[/green]"
+            last_run = format_last_run(state.get(name))
+            next_run = "[dim]—[/dim]" if not td.enabled else format_next_run(name, config, state)
+            table.add_row(name, td.description, td.frequency, status, last_run, next_run)
 
         Console(highlight=False).print(table)
     else:
         for name, td in task_list:
-            enabled = "yes" if td.enabled else "no"
-            last_run = state.get(name, "never")
-            typer.echo(f"{name}\t{td.description}\t{td.frequency}\t{enabled}\t{last_run}")
+            if not td.enabled:
+                status = "disabled"
+            elif shutil.which(td.detect) is None:
+                status = "not found"
+            else:
+                status = "ready"
+            last_run = format_last_run(state.get(name))
+            next_run = "—" if not td.enabled else format_next_run(name, config, state)
+            typer.echo(
+                f"{name}\t{td.description}\t{td.frequency}\t{status}\t{last_run}\t{next_run}"
+            )
 
 
 @app.command()

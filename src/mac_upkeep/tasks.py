@@ -70,6 +70,43 @@ def _update_last_run(task_key: str) -> None:
     _save_state(state)
 
 
+def format_last_run(last_run_str: str | None) -> str:
+    """Humanize a last-run ISO timestamp: 'today', '1 day ago', 'N days ago', or 'never'."""
+    if not last_run_str:
+        return "never"
+    try:
+        last_run = datetime.fromisoformat(last_run_str)
+    except ValueError:
+        return "never"
+    days = (datetime.now() - last_run).days
+    if days == 0:
+        return "today"
+    if days == 1:
+        return "1 day ago"
+    return f"{days} days ago"
+
+
+def format_next_run(task_key: str, config: Config, state: dict[str, str] | None = None) -> str:
+    """Return relative time until task is next eligible: 'now', 'in 1 day', 'in N days'."""
+    if state is None:
+        state = _load_state()
+    last_run_str = state.get(task_key)
+    if not last_run_str:
+        return "now"
+    try:
+        last_run = datetime.fromisoformat(last_run_str)
+    except ValueError:
+        return "now"
+    frequency = config.get_frequency(task_key)
+    threshold = FREQUENCY_THRESHOLDS.get(frequency, 6)
+    remaining = threshold - (datetime.now() - last_run).days
+    if remaining <= 0:
+        return "now"
+    if remaining == 1:
+        return "in 1 day"
+    return f"in {remaining} days"
+
+
 def strip_ansi(text: str) -> str:
     """Remove ANSI color codes from text."""
     return ANSI_PATTERN.sub("", text)
@@ -175,7 +212,8 @@ def _run(
 
     # Frequency: skip if ran recently (no --force = frequency applies)
     if not dry_run and force_tasks is None and not _should_run(task_key, config):
-        result = TaskResult(name, "skipped", reason="ran recently")
+        next_str = format_next_run(task_key, config)
+        result = TaskResult(name, "skipped", reason=f"ran recently, next {next_str}")
         output.task_done(result)
         return result
 

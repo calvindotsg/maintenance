@@ -43,7 +43,7 @@ uvx mac-upkeep run            # one-off without installing
 Tasks auto-detect installed tools — missing tools are skipped. Use `--force <task>` to run a specific task on demand.
 
 ```bash
-mac-upkeep tasks  # See all tasks with frequency and last-run status
+mac-upkeep tasks  # See all tasks with status, frequency, and next run
 ```
 
 ## Usage
@@ -54,7 +54,7 @@ mac-upkeep run --dry-run             # Preview without executing
 mac-upkeep run --force brew_update   # Run only brew_update
 mac-upkeep run --force all           # Run all, ignoring schedule
 mac-upkeep run --debug               # Verbose output
-mac-upkeep tasks                     # List tasks with status
+mac-upkeep tasks                     # List tasks with status and next run
 mac-upkeep init                      # Generate config (detects your tools)
 mac-upkeep show-config --default     # Show all available task options
 mac-upkeep show-config               # Show your config overrides

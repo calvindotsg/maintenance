@@ -23,7 +23,7 @@ defaults.toml → bundled task definitions (11 tasks), loaded via importlib.reso
 config.py     → TaskDef dataclass, load_task_defs(), resolve_variables(), get_brew_prefix(),
                 Config.load() (3-layer merge: defaults.toml → user config → env vars)
 tasks.py      → _build_cmd(), run_task(), _run(), run_all_tasks() data-driven loop,
-                frequency scheduling, ANSI stripping
+                frequency scheduling, format_last_run(), format_next_run(), ANSI stripping
 cli.py        → Typer app: run, tasks, init, show-config, setup, status, logs, notify-test
 output.py     → TaskResult dataclass, Rich Live table TUI (interactive), Python logging (non-interactive)
 notify.py     → macOS notifications via terminal-notifier (preferred) / osascript (fallback)
@@ -64,6 +64,8 @@ Do not add conditions to the filter or remove the `force_tasks is None` guard fr
 - Thresholds are 6 days for weekly and 27 days for monthly (not 7/30 — buffer for launchd schedule drift after sleep/reboot). State tracked in `~/.local/state/mac-upkeep/last-run.json`.
 - **Safety net**: prevents redundant runs from RunAtLoad boot triggers, launchd coalescing, and manual `mac-upkeep run`. `run_at_load true` is intentional — `StartCalendarInterval` does NOT coalesce from power-off (only sleep), so RunAtLoad is essential for laptops that reboot frequently.
 - Timestamps only update on successful non-dry-run execution. Corrupt/missing state file silently triggers re-run.
+- **`FREQUENCY_THRESHOLDS` is dual-purpose**: used for gating in `_should_run()` and for display in `format_next_run()`. `format_next_run()` accepts an optional `state` dict parameter to avoid redundant `_load_state()` calls — the `tasks` command pre-loads state once; `_run()` skip path omits it (one-off read is fine).
+- **Status column priority in `tasks` command**: `disabled → not found → ready` mirrors the check order in `run_task()` (disabled check then detection check) but is computed independently in `cli.py` using `td.enabled` and `shutil.which(td.detect)`. `td.detect` is already variable-resolved and auto-inferred by `Config.load()`, so `shutil.which(td.detect)` works directly — no raw TOML variable resolution needed.
 
 ### Output and notifications
 

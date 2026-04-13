@@ -22,7 +22,7 @@ Adjust versions/paths:
 - terminal-notifier with osascript fallback for any macOS launchd service needing actionable notifications
 - `repository_dispatch` + GitHub App for cross-repo automation
 - `subprocess.run(stdin=subprocess.DEVNULL)` for any CLI orchestrator wrapping interactive tools
-- Per-task frequency scheduling with XDG state file + threshold buffers for any periodic CLI tool
+- Per-task frequency scheduling with XDG state file + threshold buffers + humanized next-run/last-run formatting for any periodic CLI tool
 - `RunAtLoad true` + application-level frequency thresholds for reliable launchd scheduling on laptops — `StartCalendarInterval` does NOT coalesce from power-off (only sleep), so RunAtLoad is the reliable trigger with thresholds preventing over-running
 - Notification suppression when all tasks skip (`has_activity` guard) — for any RunAtLoad service that would otherwise notify on every boot
 - newsyslog.d config generation via setup command for any macOS launchd service needing log rotation

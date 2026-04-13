@@ -20,7 +20,7 @@ updates, mole system optimization, and Brewfile enforcement.
 - TOML-driven task registry — add tasks without code changes
 - Rich Live TUI for interactive use, plain logging for launchd
 - macOS notifications via terminal-notifier with osascript fallback
-- Per-task frequency scheduling (weekly/monthly) with schedule drift buffers
+- Per-task frequency scheduling (weekly/monthly) with schedule drift buffers and next-run visibility
 - Custom tasks in user config.toml
 
 ## Links
