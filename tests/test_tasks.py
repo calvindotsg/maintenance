@@ -14,6 +14,8 @@ from mac_upkeep.tasks import (
     _run,
     _should_run,
     _update_last_run,
+    format_last_run,
+    format_next_run,
     run_all_tasks,
     run_task,
     strip_ansi,
@@ -246,7 +248,7 @@ def test_run_frequency_skip(tmp_path, monkeypatch):
         detect="gcloud",
     )
     assert result.status == "skipped"
-    assert result.reason == "ran recently"
+    assert result.reason.startswith("ran recently, next")
 
 
 @patch("mac_upkeep.tasks.subprocess.run")
@@ -365,3 +367,68 @@ def test_failed_task_no_timestamp_update(mock_which, mock_run, tmp_path, monkeyp
     )
     assert result.status == "failed"
     assert not state_file.exists()
+
+
+# --- format_last_run ---
+
+
+def test_format_last_run_none():
+    assert format_last_run(None) == "never"
+
+
+def test_format_last_run_corrupt():
+    assert format_last_run("not-a-date") == "never"
+
+
+def test_format_last_run_today():
+    ts = datetime.now().isoformat(timespec="seconds")
+    assert format_last_run(ts) == "today"
+
+
+def test_format_last_run_one_day_ago():
+    ts = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
+    assert format_last_run(ts) == "1 day ago"
+
+
+def test_format_last_run_many_days_ago():
+    ts = (datetime.now() - timedelta(days=5)).isoformat(timespec="seconds")
+    assert format_last_run(ts) == "5 days ago"
+
+
+# --- format_next_run ---
+
+
+def test_format_next_run_never_ran(tmp_path, monkeypatch):
+    """Never ran → immediately eligible → 'now'."""
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", tmp_path / "last-run.json")
+    config = Config.load()
+    assert format_next_run("gcloud", config) == "now"
+
+
+def test_format_next_run_within_threshold(tmp_path, monkeypatch):
+    """gcloud is monthly (27-day threshold), ran 1 day ago → 26 days remaining."""
+    state_file = tmp_path / "last-run.json"
+    recent = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
+    state_file.write_text(json.dumps({"gcloud": recent}))
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
+    config = Config.load()
+    assert format_next_run("gcloud", config) == "in 26 days"
+
+
+def test_format_next_run_past_threshold(tmp_path, monkeypatch):
+    """gcloud ran 30 days ago (past 27-day threshold) → 'now'."""
+    state_file = tmp_path / "last-run.json"
+    old = (datetime.now() - timedelta(days=30)).isoformat(timespec="seconds")
+    state_file.write_text(json.dumps({"gcloud": old}))
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", state_file)
+    config = Config.load()
+    assert format_next_run("gcloud", config) == "now"
+
+
+def test_format_next_run_with_state_param(tmp_path, monkeypatch):
+    """Pre-loaded state dict bypasses file read and produces same result."""
+    monkeypatch.setattr("mac_upkeep.tasks._STATE_FILE", tmp_path / "last-run.json")
+    config = Config.load()
+    recent = (datetime.now() - timedelta(days=1)).isoformat(timespec="seconds")
+    state = {"gcloud": recent}
+    assert format_next_run("gcloud", config, state) == "in 26 days"

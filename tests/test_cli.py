@@ -50,6 +50,19 @@ def test_tasks_command():
     assert result.exit_code == 0
     for name in ["brew_update", "gcloud", "mo_clean", "brew_bundle"]:
         assert name in result.output
+    assert "ready" in result.output
+
+
+def test_tasks_shows_not_found_status(tmp_path):
+    config_path = tmp_path / "config.toml"
+    with (
+        patch("mac_upkeep.cli.DEFAULT_CONFIG_PATH", config_path),
+        patch("mac_upkeep.config.get_brew_prefix", return_value="/opt/homebrew"),
+        patch("mac_upkeep.cli.shutil.which", return_value=None),
+    ):
+        result = runner.invoke(app, ["tasks"])
+    assert result.exit_code == 0
+    assert "not found" in result.output
 
 
 def test_force_invalid_shows_valid_tasks():
