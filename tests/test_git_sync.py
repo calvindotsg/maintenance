@@ -207,6 +207,57 @@ def test_aggregate_mixed(tmp_path, monkeypatch):
     assert result.reason == "3 pulled, 2 skipped"
 
 
+# --- env hardening ---
+
+
+def test_env_forces_no_terminal_prompt(tmp_path, monkeypatch):
+    p = _make_repo(tmp_path, "biz")
+    config = _config([p])
+    output = MagicMock()
+    run_mock = MagicMock(
+        side_effect=[
+            _cp(returncode=0, stdout="true\n"),
+            _cp(returncode=0, stdout="origin\n"),
+            _cp(returncode=0, stdout="main\n"),
+            _cp(returncode=0, stdout="origin/main\n"),
+            _cp(returncode=0, stdout=""),
+            _cp(returncode=0, stdout="Already up to date.\n"),
+        ]
+    )
+    monkeypatch.setattr("mac_upkeep.git_sync.subprocess.run", run_mock)
+    result = run_git_sync(config, output, dry_run=False)
+    assert result.status == "ok"
+    assert run_mock.call_count == 6
+    for call in run_mock.call_args_list:
+        env = call.kwargs["env"]
+        assert env["GIT_TERMINAL_PROMPT"] == "0"
+        assert env["GIT_ASKPASS"] == "/usr/bin/true"
+
+
+def test_env_respects_user_askpass(tmp_path, monkeypatch):
+    monkeypatch.setenv("GIT_ASKPASS", "/opt/my-askpass")
+    p = _make_repo(tmp_path, "biz")
+    config = _config([p])
+    output = MagicMock()
+    run_mock = MagicMock(
+        side_effect=[
+            _cp(returncode=0, stdout="true\n"),
+            _cp(returncode=0, stdout="origin\n"),
+            _cp(returncode=0, stdout="main\n"),
+            _cp(returncode=0, stdout="origin/main\n"),
+            _cp(returncode=0, stdout=""),
+            _cp(returncode=0, stdout="Already up to date.\n"),
+        ]
+    )
+    monkeypatch.setattr("mac_upkeep.git_sync.subprocess.run", run_mock)
+    result = run_git_sync(config, output, dry_run=False)
+    assert result.status == "ok"
+    for call in run_mock.call_args_list:
+        env = call.kwargs["env"]
+        assert env["GIT_ASKPASS"] == "/opt/my-askpass"
+        assert env["GIT_TERMINAL_PROMPT"] == "0"
+
+
 def test_failure_surfaces_basename_and_stderr(tmp_path, monkeypatch):
     p = _make_repo(tmp_path, "biz")
     config = _config([p])

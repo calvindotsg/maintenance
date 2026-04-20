@@ -21,6 +21,13 @@ def _strip_ansi(text: str) -> str:
     return _ANSI_PATTERN.sub("", text)
 
 
+def _build_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    env.setdefault("GIT_ASKPASS", "/usr/bin/true")
+    return env
+
+
 def _run_git(path: str, args: list[str], *, timeout: int = 60) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         ["git", "-C", path, *args],
@@ -28,6 +35,7 @@ def _run_git(path: str, args: list[str], *, timeout: int = 60) -> subprocess.Com
         text=True,
         timeout=timeout,
         stdin=subprocess.DEVNULL,
+        env=_build_env(),
     )
 
 

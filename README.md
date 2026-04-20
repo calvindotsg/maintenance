@@ -129,7 +129,17 @@ repos = [
 skip_dirty = true         # skip repos with uncommitted changes
 ```
 
-Each repo is skipped with a reason if it's not a git repo, has no remote, has no upstream branch, or (when `skip_dirty = true`) has uncommitted changes. SSH auth under launchd requires a path-based `IdentityAgent` entry in `~/.ssh/config` (e.g. 1Password's agent socket) — `SSH_AUTH_SOCK` env vars are not inherited by LaunchAgents.
+Each repo is skipped with a reason if it's not a git repo, has no remote, has no upstream branch, or (when `skip_dirty = true`) has uncommitted changes.
+
+#### Authentication
+
+Any of the following work under launchd without mac-upkeep-side configuration:
+
+- **SSH + `IdentityAgent` (recommended under launchd):** a path-based entry in `~/.ssh/config` pointing at any SSH agent's UNIX socket. Works because the directive is a file path, not the `SSH_AUTH_SOCK` env var that launchd would strip.
+- **HTTPS + credential helper:** `gh auth setup-git` or `git config --global credential.helper osxkeychain`. Requires the helper binary on the launchd `PATH`.
+- **`[url].insteadOf` rewrite:** force SSH regardless of remote protocol by rewriting `https://<host>/` in `~/.gitconfig` to a matching SSH `Host` alias. Bypasses HTTPS auth entirely.
+
+git_sync sets `GIT_TERMINAL_PROMPT=0` and a no-op `GIT_ASKPASS` default (user-set `GIT_ASKPASS` is respected) so misconfigured auth fails in milliseconds instead of stalling to the 60 s subprocess timeout.
 
 ### Environment variables
 
